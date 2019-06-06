@@ -20,4 +20,21 @@ void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
 
 }
 
+void uart_rx_it(UART_HandleTypeDef *str_uart, char *buff, char *buff_size) {
+	HAL_StatusTypeDef status;
+	char current_char;
+	uint16_t char_counter = 0;
+
+	while(char_counter < buff_size - 1) {
+		status = HAL_UART_Receive_IT(str_uart, &current_char, 1);
+		if (status == HAL_OK) {
+			if (current_char == '\n') {
+				if (char_counter == 0) continue;
+				else break;
+			*(buff + char_counter++) = current_char;
+			}
+		}
+	}
+	*(buff + char_counter) = '\0';
+}
 

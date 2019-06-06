@@ -23,7 +23,8 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <stdio.h>
+#include "uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -50,7 +51,7 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 uint32_t time; // Current time in milisecond
-uint8_t data[50]; //Table with message
+char data[50]; //Table with message
 uint16_t size = 0; //Size of message
 /* USER CODE END PV */
 
@@ -102,7 +103,7 @@ int main(void)
   MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim10);
-  uart_tx_it(&huart2, first_message);
+  uart_tx(&huart2, first_message);
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -270,7 +271,9 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim -> Instance == TIM10) {
-
+		size = sprintf(data, "%ld\n", time);
+		uart_tx(&huart2, data);
+		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_13);
 	}
 }
 /* USER CODE END 4 */

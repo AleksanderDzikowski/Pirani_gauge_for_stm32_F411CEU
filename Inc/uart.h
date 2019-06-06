@@ -14,6 +14,8 @@
 
 extern uint32_t time_uart;
 
+void uart_tx(UART_HandleTypeDef *str_uart, char *text);
 void uart_tx_it(UART_HandleTypeDef *str_uart, char *text);
+void uart_rx_it(UART_HandleTypeDef *str_uart, char *buff, char *buff_size);
 
 #endif /* UART_H_ */
