@@ -43,7 +43,7 @@
 char first_message[] = "Time[ms]\t U_A1[V]\t U_A2[V]\t P[mW]\t I[mA]\t PWM[%]\n";
 char first_info[] =
 		{
-				"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxx\n Where xxx is number between 0 and 100. You should remembered type three digits for all case \n For instance: 081 for 81 %.\n" };
+				"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxx\nwhere xxx is number between 0 and 100. You should remembered type three digits for all case \nfor instance: 081 for 81 %.\n" };
 char second_info[] =
 		{
 				"If you want to start measure type '$SET_STA' and type '$SET_HLD' for finish.\n" };
@@ -285,44 +285,33 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 	if (uart == &huart2) {
-		uart_tx(&huart2, data_rx);
 		strncpy(first, data_rx, 5);
-		//first[5] = '\0';
-
-		uart_tx(&huart2, first);
-
 		if (strncmp(first, "$SET_", 5) == 0) {
-			uart_tx(&huart2, first);
 			strncpy(second, data_rx + 5, 3);
-			//second[3] = '\0';
 			if (strncmp(second, "STA", 3) == 0) {
 				HAL_TIM_Base_Start_IT(&htim10); // Starting timer
-				uart_tx(&huart2, first_message); //Sending firs message with description
-				uart_tx(&huart2, "STA - Receive\n"); //TESTING
+				uart_tx_dma(&huart2, first_message); //Sending firs message with description
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			} else if (strncmp(second, "HLD", 3) == 0) {
-				uart_tx(&huart2, "Finish");
+				uart_tx_dma(&huart2, "Finish\n");
 				HAL_TIM_Base_Stop_IT(&htim10);
-				uart_tx(&huart2, "HLD - Receive\n"); //TESTING
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			} else if (strncmp(second, "100", 3) == 0) {
 				set_pwm = atoi(second);
-				sprintf(data_tx, "Seting PWM: %f\n", set_pwm);
+				sprintf(data_tx, "Seting PWM: %f", set_pwm);
 				uart_tx(&huart2, data_tx);
-				uart_tx(&huart2, "100 - Receive\n"); //TESTING
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			} else if (second[0] == '0') {
 				set_pwm = atoi(second);
-				sprintf(data_tx, "Seting PWM: %f\n", set_pwm);
+				sprintf(data_tx, "Seting PWM: %f", set_pwm);
 				uart_tx(&huart2, data_tx);
-				uart_tx(&huart2, "0xx - Receive\n"); //TESTING
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			} else {
-				uart_tx(&huart2, "Wrong format. Try again.\n"); //TESTING
+				uart_tx_dma(&huart2, "Wrong format. Try again.\n"); //TESTING
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			}
 		} else {
-			uart_tx(&huart2,
+			uart_tx_dma(&huart2,
 					"Wrong format. Code should started with $SET_xxx.\n");
 			HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 		}
