@@ -10,15 +10,44 @@
 
 uint32_t time_uart = 500;
 
+/*
+ * @brief Transmitting data without iterrupt (blocking)
+ * @param Pointer to UART handle structure definition
+ * @param Pointer to string with data to send
+ * */
+
 void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
 	HAL_UART_Transmit(str_uart, text, strlen(text), time_uart);
 }
 
+/*
+ * @brief Transmitting data with iterrupt (non blocking)
+ * @param Pointer to UART handle structure definition
+ * @param Pointer to string with data to send
+ * */
+
 void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
 	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
-	HAL_UART_Transmit(str_uart, "\n", 2, time_uart);
+	HAL_UART_Transmit_DMA(str_uart, "\n", 2);
+}
+
+/*
+ * @brief Transmitting data with DMA mechanism (non blocking)
+ * @param Pointer to UART handle structure definition
+ * @param Pointer to string with data to send
+ * */
+
+void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
+	HAL_UART_Transmit_DMA(str_uart, text, strlen(text));
+	HAL_UART_Transmit_DMA(&str_uart, "\n", 2);
 
 }
+
+/*
+ * @brief Receiving data with iterrupt (non blocking). Function have mechanism to controlling error and corrupted insert data.
+ * @param Pointer to UART handle structure definition
+ * @param Pointer to string with data to send
+ * */
 
 void uart_rx_it(UART_HandleTypeDef *str_uart, char *buff, char *buff_size) {
 	HAL_StatusTypeDef status;
