@@ -40,7 +40,7 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-char first_message[] = "Time[ms]\t U_Out[V]\t U_Resistor[V]\t P[mW]\t I[mA]\t PWM[%]\n";
+char first_message[] = "Time[s]\t U_Out[V]\t U_Resis[V]\t P[mW]\t I[mA]\t PWM[%]\n";
 
 char first_info[] =
 		{
@@ -63,17 +63,17 @@ DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
 volatile uint32_t time; // Current time in milisecond
-char data_rx[8]; //Table with received message
+char data_rx[10]; //Table with received message
 char data_tx[50]; //Table with message to send
 char first[6], second[6]; // Tables for checking receive string
 volatile int16_t value = 0; // Variable using in receiving iterrupt
 volatile uint8_t controling = 0; //Variable to seting function
-volatile int set_pwm = 0;
+volatile uint32_t set_pwm = 0;
 volatile uint16_t Measure[3]; // Table contain measure
-
+volatile float Voltage[3];
 volatile float Power = 0;
 volatile float Current = 0;
-volatile uint16_t Pwm_per_cent = 0;
+volatile float Pwm_per_cent = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -129,7 +129,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	uart_tx(&huart2, first_info);
 	uart_tx(&huart2, second_info);
-	HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+	HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -415,17 +415,27 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
-		sprintf(data_tx, "%d %f %f %f %f %d\n", time, Measure[0], Measure[1], Power, Current, Pwm_per_cent);
+		Voltage[0] = (float) Measure[0] * 3.3f / 4096.0f;
+		Voltage[1] = (float) Measure[1] * 3.3f / 4096.0f;
+
+		Current = Voltage[1] / 22.0f;
+		Power = Voltage[0] * Current;
+		Pwm_per_cent = (float) set_pwm / 10000.0f;
+		sprintf(data_tx, "%.3f\t %1.3f\t %1.3f\t %1.3f\t %1.3f\t %3.2f\n", (float)time / 1000.0f, Voltage[0], Voltage[1], Power, Current, Pwm_per_cent);
 		uart_tx(&huart2, data_tx);
 		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_13);
 	}
+}
+
+void HAL_SYSTICK_Callback(void) {
+	time++;
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 	if (uart == &huart2) {
 		strncpy(first, data_rx, 5);
 		if (strncmp(first, "$SET_", 5) == 0) {
-			strncpy(second, data_rx + 5, 3);
+			strncpy(second, data_rx + 5, 5);
 			if (strncmp(second, "START", 5) == 0) {
 				HAL_TIMEx_PWMN_Start(&htim2, TIM_CHANNEL_3);
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
@@ -433,47 +443,44 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 				HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
 
 				uart_tx_dma(&huart2, first_message); //Sending firs message with description
-				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+				time = 0;
+				HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 			} else if (strncmp(second, "STOP_", 5) == 0) {
 				HAL_TIMEx_PWMN_Stop(&htim2, TIM_CHANNEL_3);
 				HAL_ADC_Stop_DMA(&hadc1);
 				uart_tx_dma(&huart2, "Finish\n");
 				HAL_TIM_Base_Stop_IT(&htim10);
-				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+				HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 
 			} else if (strncmp(second, "10000", 5) == 0) {
 				set_pwm = atoi(second) - 1;
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
-				sprintf(data_tx, "Seting PWM: %f", set_pwm);
+				sprintf(data_tx, "Seting PWM: %.2f%\n", (float) set_pwm / 100.0f);
 				uart_tx(&huart2, data_tx);
-				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+				HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 			} else if (second[0] == '0') {
 				set_pwm = atoi(second);
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
-				sprintf(data_tx, "Seting PWM: %f", set_pwm);
+				sprintf(data_tx, "Seting PWM: %.2f%\n", (float) set_pwm / 100.0f);
 				uart_tx(&huart2, data_tx);
-				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+				HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 			} else if ( strncmp(second, "RAKE_", 5) == 0 ) {
 				controling = 1;
 			}
 			else {
 				uart_tx_dma(&huart2, "Wrong format. Try again.\n");
-				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+				HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 			}
 		} else {
 			uart_tx_dma(&huart2,
-					"Wrong format. Code should started with $SET_xxx.\n");
-			HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+					"Wrong format. Code should started with $SET_xxxxx.\n");
+			HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 		}
-		HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+		HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 		memset( data_rx, 0, strlen(data_rx));
 		memset( first, 0, strlen(first));
 		memset( second, 0, strlen(second));
 	}
-}
-
-void HAL_SYSTICK_Callback(void) {
-
 }
 
 /* USER CODE END 4 */
