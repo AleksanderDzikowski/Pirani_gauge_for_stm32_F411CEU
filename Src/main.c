@@ -40,7 +40,8 @@
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-char first_message[] = "Time[ms]\t U_A1[V]\t U_A2[V]\t P[mW]\t I[mA]\t PWM[%]\n";
+char first_message[] = "Time[ms]\t U_Out[V]\t U_Resistor[V]\t P[mW]\t I[mA]\t PWM[%]\n";
+
 char first_info[] =
 		{
 				"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxxxx\nwhere xxx is number between 0 and 10000. You should remembered type three digits for all case \nfor instance: 081125 for 81,125 %.\n" };
@@ -50,6 +51,9 @@ char second_info[] =
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
+
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 
@@ -58,13 +62,18 @@ DMA_HandleTypeDef hdma_usart2_rx;
 DMA_HandleTypeDef hdma_usart2_tx;
 
 /* USER CODE BEGIN PV */
-uint32_t time; // Current time in milisecond
+volatile uint32_t time; // Current time in milisecond
 char data_rx[8]; //Table with received message
 char data_tx[50]; //Table with message to send
 char first[6], second[6]; // Tables for checking receive string
 volatile int16_t value = 0; // Variable using in receiving iterrupt
 volatile uint8_t controling = 0; //Variable to seting function
 volatile int set_pwm = 0;
+volatile uint16_t Measure[3]; // Table contain measure
+
+volatile float Power = 0;
+volatile float Current = 0;
+volatile uint16_t Pwm_per_cent = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -74,6 +83,7 @@ static void MX_DMA_Init(void);
 static void MX_USART2_UART_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM2_Init(void);
+static void MX_ADC1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -115,6 +125,7 @@ int main(void)
   MX_USART2_UART_Init();
   MX_TIM10_Init();
   MX_TIM2_Init();
+  MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
 	uart_tx(&huart2, first_info);
 	uart_tx(&huart2, second_info);
@@ -171,6 +182,72 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief ADC1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_ADC1_Init(void)
+{
+
+  /* USER CODE BEGIN ADC1_Init 0 */
+
+  /* USER CODE END ADC1_Init 0 */
+
+  ADC_ChannelConfTypeDef sConfig = {0};
+
+  /* USER CODE BEGIN ADC1_Init 1 */
+
+  /* USER CODE END ADC1_Init 1 */
+  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion) 
+  */
+  hadc1.Instance = ADC1;
+  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV8;
+  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+  hadc1.Init.ScanConvMode = ENABLE;
+  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.DiscontinuousConvMode = DISABLE;
+  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
+  hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+  hadc1.Init.NbrOfConversion = 3;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
+  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  if (HAL_ADC_Init(&hadc1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
+  */
+  sConfig.Channel = ADC_CHANNEL_0;
+  sConfig.Rank = 1;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
+  */
+  sConfig.Channel = ADC_CHANNEL_1;
+  sConfig.Rank = 2;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time. 
+  */
+  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Rank = 3;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN ADC1_Init 2 */
+
+  /* USER CODE END ADC1_Init 2 */
+
 }
 
 /**
@@ -293,6 +370,7 @@ static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
+  __HAL_RCC_DMA2_CLK_ENABLE();
 
   /* DMA interrupt init */
   /* DMA1_Stream5_IRQn interrupt configuration */
@@ -301,6 +379,9 @@ static void MX_DMA_Init(void)
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 
 }
 
@@ -334,6 +415,7 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
+		sprintf(data_tx, "%d %f %f %f %f %d\n", time, Measure[0], Measure[1], Power, Current, Pwm_per_cent);
 		uart_tx(&huart2, data_tx);
 		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_13);
 	}
@@ -347,13 +429,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 			if (strncmp(second, "START", 5) == 0) {
 				HAL_TIMEx_PWMN_Start(&htim2, TIM_CHANNEL_3);
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
+				HAL_ADC_Start_DMA(&hadc1, Measure, 3);
 				HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
 
 				uart_tx_dma(&huart2, first_message); //Sending firs message with description
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
 			} else if (strncmp(second, "STOP_", 5) == 0) {
 				HAL_TIMEx_PWMN_Stop(&htim2, TIM_CHANNEL_3);
-
+				HAL_ADC_Stop_DMA(&hadc1);
 				uart_tx_dma(&huart2, "Finish\n");
 				HAL_TIM_Base_Stop_IT(&htim10);
 				HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
