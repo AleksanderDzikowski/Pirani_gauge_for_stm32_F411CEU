@@ -28,19 +28,7 @@ void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
 
 void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
 	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
-	HAL_UART_Transmit_DMA(str_uart, "\n", 2);
-}
-
-/*
- * @brief Transmitting data with DMA mechanism (non blocking)
- * @param Pointer to UART handle structure definition
- * @param Pointer to string with data to send
- * */
-
-void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit_DMA(str_uart, text, strlen(text));
-	HAL_UART_Transmit_DMA(&str_uart, "\n", 2);
-
+	HAL_UART_Transmit(str_uart, "\n", 2);
 }
 
 /*
