@@ -8,7 +8,7 @@
 #include "uart.h"
 
 
-uint32_t time_uart = 500;
+uint32_t time_uart = 150;
 
 /*
  * @brief Transmitting data without iterrupt (blocking)
@@ -28,7 +28,6 @@ void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
 
 void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
 	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
-	HAL_UART_Transmit(str_uart, "\n", 2);
 }
 
 /*
