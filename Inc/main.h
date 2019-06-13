@@ -68,8 +68,6 @@ void Error_Handler(void);
 #define U_REF_GPIO_Port GPIOA
 #define PWM_ADC_Pin GPIO_PIN_10
 #define PWM_ADC_GPIO_Port GPIOB
-#define LED_BLUE_Pin GPIO_PIN_13
-#define LED_BLUE_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

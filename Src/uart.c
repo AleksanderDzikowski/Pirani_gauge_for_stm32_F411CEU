@@ -17,7 +17,7 @@ uint32_t time_uart = 150;
  * */
 
 void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit(str_uart, text, strlen(text), time_uart);
+	HAL_UART_Transmit(str_uart, (uint8_t*)text, strlen(text), time_uart);
 }
 
 /*
@@ -27,7 +27,7 @@ void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
  * */
 
 void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
+	HAL_UART_Transmit_IT(str_uart, (uint8_t*)text, strlen(text));
 }
 
 /*
@@ -36,7 +36,7 @@ void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
  * @param Pointer to string with data to send
  * */
 void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
+	HAL_UART_Transmit_IT(str_uart, (uint8_t*)text, strlen(text));
 }
 
 /*
@@ -47,10 +47,10 @@ void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
 
 void uart_rx_it(UART_HandleTypeDef *str_uart, char *buff, char *buff_size) {
 	HAL_StatusTypeDef status;
-	char current_char;
+	uint8_t current_char;
 	uint16_t char_counter = 0;
 
-	while(char_counter < buff_size - 1) {
+	while(char_counter < *buff_size - 1) {
 		status = HAL_UART_Receive_IT(str_uart, &current_char, 1);
 		if (status == HAL_OK) {
 			if (current_char == '\n') {
