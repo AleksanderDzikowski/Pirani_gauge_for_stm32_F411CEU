@@ -60,7 +60,6 @@ TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_tx;
-DMA_HandleTypeDef hdma_usart2_rx;
 
 /* USER CODE BEGIN PV */
 volatile uint32_t time; // Current time in milisecond
@@ -69,7 +68,7 @@ char data_tx[50]; //Table with message to send
 char first[6], second[6]; // Tables for checking receive string
 volatile int16_t value = 0; // Variable using in receiving iterrupt
 volatile uint8_t controling = 0; //Variable to seting function
-volatile uint32_t set_pwm = 0;
+volatile uint32_t set_pwm = 50 * 9999/100;
 volatile uint32_t number = 0;
 volatile uint16_t Measure[3]; // Table contain measure
 volatile float Voltage[3];
@@ -129,27 +128,19 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-	uart_tx(&huart2, first_info);
-	uart_tx(&huart2, second_info);
+  	uart_tx_dma(&huart2, first_info);
+	uart_tx_dma(&huart2, second_info);
 	HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
+
+	//HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+	//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 9999);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 	while (1) {
     /* USER CODE END WHILE */
-		if (controling == 1) {
-			number++;
-			Voltage[0] = (float) Measure[0] * 3.3f / 4096.0f;
-			Voltage[1] = (float) Measure[1] * 3.3f / 4096.0f;
 
-			Current = Voltage[1] / 22.0f;
-			Power = Voltage[0] * Current;
-			Pwm_per_cent = (float) set_pwm / 100.0f;
-			sprintf(data_tx, "%3ld\t %.3f\t %1.3f\t %1.3f\t %1.3f\t %1.3f\t %3.2f\n",
-					number, (float) time / 1000.0f, Voltage[0], Voltage[1], Power, Current,
-					Pwm_per_cent);
-		}
     /* USER CODE BEGIN 3 */
 	}
   /* USER CODE END 3 */
@@ -338,7 +329,7 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 9999;
+  htim10.Init.Prescaler = 999;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 1999;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -396,9 +387,6 @@ static void MX_DMA_Init(void)
   __HAL_RCC_DMA1_CLK_ENABLE();
 
   /* DMA interrupt init */
-  /* DMA1_Stream5_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
   /* DMA1_Stream6_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
@@ -438,7 +426,11 @@ static void MX_GPIO_Init(void)
 /* USER CODE BEGIN 4 */
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
-		uart_tx_dma(&huart2, data_tx);
+		number++;
+		Voltage[0] = (float) Measure[0] * 3.3f / 4096.0f;
+		Voltage[1] = (float) Measure[1] * 3.3f / 4096.0f;
+		sprintf(data_tx, "%1.3f\t%1.3f\n", Voltage[0], Voltage[1]);
+		uart_tx_it(&huart2, data_tx);
 		HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_13);
 	}
 }
@@ -448,23 +440,23 @@ void HAL_SYSTICK_Callback(void) {
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
+	HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 	if (uart == &huart2) {
-		HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
 		strncpy(first, data_rx, 5);
 		if (strncmp(first, "$SET_", 5) == 0) {
 			strncpy(second, data_rx + 5, 5);
 			if (strncmp(second, "START", 5) == 0) {
 				time = 0;
+				uart_tx_it(&huart2, first_message); //Sending firs message with description
 				HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
 				HAL_ADC_Start_DMA(&hadc1, Measure, 3);
 				controling = 1;
 				HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
-				uart_tx_dma(&huart2, first_message); //Sending firs message with description
 			} else if (strncmp(second, "STOP_", 5) == 0) {
 				controling = 0;
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-				HAL_TIMEx_PWMN_Stop(&htim2, TIM_CHANNEL_3);
+				HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
 				HAL_ADC_Stop_DMA(&hadc1);
 				HAL_TIM_Base_Stop_IT(&htim10);
 			} else if (strncmp(second, "10000", 5) == 0) {
@@ -472,7 +464,6 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, set_pwm);
 			} else if (second[0] == '0') {
 				set_pwm = atoi(second);
-				uart_tx_dma(&huart2, data_tx);
 			} else {
 				uart_tx_dma(&huart2, "Wrong format. Try again.\n");
 			}
