@@ -31,6 +31,15 @@ void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
 }
 
 /*
+ * @brief Transmitting data with DMA (non blocking)
+ * @param Pointer to UART handle structure definition
+ * @param Pointer to string with data to send
+ * */
+void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
+	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
+}
+
+/*
  * @brief Receiving data with iterrupt (non blocking). Function have mechanism to controlling error and corrupted insert data.
  * @param Pointer to UART handle structure definition
  * @param Pointer to string with data to send
