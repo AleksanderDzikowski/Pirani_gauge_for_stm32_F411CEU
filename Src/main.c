@@ -230,7 +230,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -332,7 +332,7 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 999;
+  htim10.Init.Prescaler = 9999;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 1999;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -478,7 +478,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 				}
 			} else if (strncmp(second, "RAKE_", 5) == 0) {
-				*ptr_pwm = 70*9999/100;
+				*ptr_pwm = 50*9999/100;
 				if (controling == 1) {
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 					controling = 2;
@@ -491,7 +491,20 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 					controling = 2;
 					__HAL_TIM_SET_AUTORELOAD(&htim2, 1000);
 				}
-			} else {
+
+			//Czesc kodu odpowiedzialna za wobulator
+			} else if (strncmp(first, "$RLC_", 5) == 0) {
+				strncpy(second, data_rx + 5, 5);
+
+				if (strncmp(second, ".5KHZ", 5) == 0 ) {
+					__HAL_TIM_SET_PRESCALER(&htim2, 19);
+				} else if (strncmp(second, "1KHZ_", 5) == 0) {
+					__HAL_TIM_SET_PRESCALER(&htim2, 9);
+				} else if (strncmp(second, "2KHZ_", 5) == 0) {
+					__HAL_TIM_SET_PRESCALER(&htim2, 4);
+				}
+
+			}  else {
 				uart_tx_it(&huart2, "Wrong format. Try again.\n");
 			}
 		} else {
