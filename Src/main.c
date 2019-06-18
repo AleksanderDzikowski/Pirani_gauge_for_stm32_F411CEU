@@ -59,6 +59,11 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
+<<<<<<< Updated upstream
+=======
+DMA_HandleTypeDef hdma_usart2_rx;
+DMA_HandleTypeDef hdma_usart2_tx;
+>>>>>>> Stashed changes
 
 /* USER CODE BEGIN PV */
 volatile uint32_t time; // Current time in milisecond
@@ -123,6 +128,7 @@ int main(void)
 
   /* USER CODE END SysInit */
 
+<<<<<<< Updated upstream
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
@@ -141,6 +147,21 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+=======
+	/* Initialize all configured peripherals */
+	MX_GPIO_Init();
+	MX_DMA_Init();
+	MX_USART2_UART_Init();
+	MX_TIM10_Init();
+	/* USER CODE BEGIN 2 */
+	uart_tx(&huart2, first_info);
+	uart_tx(&huart2, second_info);
+	HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+	/* USER CODE END 2 */
+
+	/* Infinite loop */
+	/* USER CODE BEGIN WHILE */
+>>>>>>> Stashed changes
 	while (1) {
     /* USER CODE END WHILE */
 
@@ -316,6 +337,7 @@ static void MX_TIM2_Init(void)
 
 }
 
+<<<<<<< Updated upstream
 /**
   * @brief TIM10 Initialization Function
   * @param None
@@ -380,6 +402,8 @@ static void MX_USART2_UART_Init(void)
 
 }
 
+=======
+>>>>>>> Stashed changes
 /** 
   * Enable DMA controller clock
   */
@@ -388,10 +412,20 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
 
+<<<<<<< Updated upstream
   /* DMA interrupt init */
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
+=======
+	/* DMA interrupt init */
+	/* DMA1_Stream5_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+	/* DMA1_Stream6_IRQn interrupt configuration */
+	HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
+>>>>>>> Stashed changes
 
 }
 
@@ -511,6 +545,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 			uart_tx_it(&huart2,
 					"Wrong format. Code should started with $SET_xxxxx.\n");
 		}
+		HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+		memset( data_rx, 0, strlen(data_rx));
+		memset( first, 0, strlen(first));
+		memset( second, 0, strlen(second));
 	}
 }
 
