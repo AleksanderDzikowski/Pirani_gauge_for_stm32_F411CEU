@@ -59,11 +59,6 @@
 extern DMA_HandleTypeDef hdma_adc1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim10;
-<<<<<<< Updated upstream
-=======
-extern DMA_HandleTypeDef hdma_usart2_tx;
-extern DMA_HandleTypeDef hdma_usart2_rx;
->>>>>>> Stashed changes
 extern UART_HandleTypeDef huart2;
 /* USER CODE BEGIN EV */
 

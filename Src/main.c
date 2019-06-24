@@ -35,7 +35,8 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define SIZE 2048
+#define ADC1_DR_Address 0x4001204C;
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,31 +60,31 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 
 UART_HandleTypeDef huart2;
-<<<<<<< Updated upstream
-=======
-DMA_HandleTypeDef hdma_usart2_rx;
-DMA_HandleTypeDef hdma_usart2_tx;
->>>>>>> Stashed changes
 
 /* USER CODE BEGIN PV */
 volatile uint32_t time; // Current time in milisecond
-char data_rx[10]; //Table with received message
-volatile char data_tx[50]; //Table with message to send
+char data_rx[10] = {0}; //Table with received message
+volatile char data_tx[50] = {0}; //Table with message to send
 char first[6], second[6]; // Tables for checking receive string
 volatile int16_t value = 0; // Variable using in receiving iterrupt
 volatile uint8_t controling = 0; //Variable to seting function
-volatile uint16_t set_pwm = 50 * 9999/100;
+volatile uint16_t set_pwm = 50 * 9999 / 100;
 volatile uint16_t *ptr_pwm = &set_pwm;
 volatile uint32_t number = 0;
-volatile uint16_t Measure[3]; // Table contain measure
+volatile uint16_t Measure[3] = {0}; // Table contain measure
 volatile uint16_t prescaler = 999;
 volatile uint16_t *ptr_prescaler = &prescaler;
 volatile uint16_t arr = 9999;
 volatile uint16_t *ptr_arr = &arr;
-volatile float Voltage[3];
+volatile float Voltage[3] = {0};
 volatile float Power = 0;
 volatile float Current = 0;
 volatile float Pwm_per_cent = 0;
+
+//Variable used in FFT
+volatile uint16_t buffADC[2*SIZE] = {0};
+uint8_t State = 0; // 0 - wait, 1 - first half, 2 - second half
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,7 +129,6 @@ int main(void)
 
   /* USER CODE END SysInit */
 
-<<<<<<< Updated upstream
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_DMA_Init();
@@ -137,31 +137,36 @@ int main(void)
   MX_TIM2_Init();
   MX_ADC1_Init();
   /* USER CODE BEGIN 2 */
-  	uart_tx_it(&huart2, first_info);
+	uart_tx_it(&huart2, first_info);
 	uart_tx_it(&huart2, second_info);
-	HAL_UART_Receive_IT(&huart2,(uint8_t*) data_rx, 11); //Turning on receiving
-	//HAL_TIM_PWM_Start_DMA(&htim2, TIM_CHANNEL_3, ptr_pwm, 1);
+	HAL_UART_Receive_IT(&huart2, (uint8_t*) data_rx, 11); //Turning on receiving
+
+
 	//HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 	//__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 9999);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-=======
+
 	/* Initialize all configured peripherals */
 	MX_GPIO_Init();
 	MX_DMA_Init();
 	MX_USART2_UART_Init();
 	MX_TIM10_Init();
 	/* USER CODE BEGIN 2 */
+
 	uart_tx(&huart2, first_info);
 	uart_tx(&huart2, second_info);
-	HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
+	HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
+	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
 	/* USER CODE BEGIN WHILE */
->>>>>>> Stashed changes
+
 	while (1) {
     /* USER CODE END WHILE */
 
@@ -337,7 +342,6 @@ static void MX_TIM2_Init(void)
 
 }
 
-<<<<<<< Updated upstream
 /**
   * @brief TIM10 Initialization Function
   * @param None
@@ -354,7 +358,7 @@ static void MX_TIM10_Init(void)
 
   /* USER CODE END TIM10_Init 1 */
   htim10.Instance = TIM10;
-  htim10.Init.Prescaler = 9999;
+  htim10.Init.Prescaler = 49;
   htim10.Init.CounterMode = TIM_COUNTERMODE_UP;
   htim10.Init.Period = 1999;
   htim10.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
@@ -402,8 +406,6 @@ static void MX_USART2_UART_Init(void)
 
 }
 
-=======
->>>>>>> Stashed changes
 /** 
   * Enable DMA controller clock
   */
@@ -412,20 +414,10 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
 
-<<<<<<< Updated upstream
   /* DMA interrupt init */
   /* DMA2_Stream0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
-=======
-	/* DMA interrupt init */
-	/* DMA1_Stream5_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
-	/* DMA1_Stream6_IRQn interrupt configuration */
-	HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
->>>>>>> Stashed changes
 
 }
 
@@ -450,27 +442,24 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
 		/*number++;
-		Voltage[0] = (float) Measure[0] * 3.3f / 4096.0f;
-		Voltage[1] = (float) Measure[1] * 3.3f / 4096.0f;
-		Current = Voltage[1] / 22.0f;
-		Power = Voltage[0] * Current;
-		Pwm_per_cent = (float) set_pwm/9999 * 100.0f;
-		sprintf(data_tx, "%1.3f\t%1.3f\t%f\t%f\t%f\n", Voltage[0], Voltage[1], Current, Power, Pwm_per_cent); */
-		sprintf(data_tx, "%d\t%d\t%d\t%d\n", Measure[0], Measure[1], *ptr_prescaler, *ptr_arr);
+		 Voltage[0] = (float) Measure[0] * 3.3f / 4096.0f;
+		 Voltage[1] = (float) Measure[1] * 3.3f / 4096.0f;
+		 Current = Voltage[1] / 22.0f;
+		 Power = Voltage[0] * Current;
+		 Pwm_per_cent = (float) set_pwm/9999 * 100.0f;
+		 sprintf(data_tx, "%1.3f\t%1.3f\t%f\t%f\t%f\n", Voltage[0], Voltage[1], Current, Power, Pwm_per_cent); */
+
+		sprintf(data_tx, "%d\t%d\n", Measure[0], Measure[1]);
 		uart_tx_it(&huart2, data_tx);
 		if (controling == 2 && prescaler > 0 && arr != 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
-				*ptr_prescaler -= 1;
+			__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
+			*ptr_prescaler -= 1;
 
-			} else if (controling == 2 && prescaler == 0) {
-				*ptr_prescaler = 999;
-				__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
-				*ptr_arr = 9999;
-				__HAL_TIM_SET_AUTORELOAD(&htim2, *ptr_arr);
+		} else if (controling == 2 && prescaler == 0) {
+			*ptr_prescaler = 49;
+			__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
 		}
-
-	}
-	else if (htim->Instance == TIM2) {
+	} else if (htim->Instance == TIM2) {
 
 	}
 }
@@ -480,75 +469,88 @@ void HAL_SYSTICK_Callback(void) {
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
-	HAL_UART_Receive_IT(&huart2,(uint8_t*) data_rx, 11); //Turning on receiving
+	HAL_UART_Receive_IT(&huart2, (uint8_t*) data_rx, 11); //Turning on receiving
 	if (uart == &huart2) {
-		strncpy(first, data_rx, 5);
-		if (strncmp(first, "$SET_", 5) == 0) {
-			strncpy(second, data_rx + 5, 5);
-			if (strncmp(second, "START", 5) == 0) {
-				time = 0;
-				uart_tx_it(&huart2, first_message); //Sending firs message with description
-				HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-				HAL_ADC_Start_DMA(&hadc1, Measure, (uint32_t)3);
-				controling = 1;
-				prescaler = 999;
-				HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
-			} else if (strncmp(second, "STOP_", 5) == 0) {
-				controling = 0;
-				prescaler = 999;
-				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-				HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
-				HAL_ADC_Stop_DMA(&hadc1);
-				HAL_TIM_Base_Stop_IT(&htim10);
-			} else if (strncmp(second, "10000", 5) == 0) {
-				*ptr_pwm = atoi(second) - 1;
-				if(controling == 1) {
+	    strncpy(first, data_rx, 5);
+	    if (strncmp(first, "$SET_", 5) == 0) {
+	        strncpy(second, data_rx + 5, 5);
+	        if (strncmp(second, "START", 5) == 0) {
+	            	time = 0;
+					uart_tx_it(&huart2, first_message); //Sending firs message with description
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-				}
-			} else if (second[0] == '0') {
-				*ptr_pwm = atoi(second);
-				if (controling == 1) {
-					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-				}
-			} else if (strncmp(second, "RAKE_", 5) == 0) {
-				*ptr_pwm = 50*9999/100;
-				if (controling == 1) {
-					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-					controling = 2;
-				} else if ( controling == 0) {
-					time = 0;
-					HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-					HAL_ADC_Start_DMA(&hadc1, Measure, 3);
+					HAL_ADC_Start_DMA(&hadc1, Measure, (uint32_t)3);
+					controling = 1;
+					prescaler = 999;
 					HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
-					controling = 2;
-					__HAL_TIM_SET_AUTORELOAD(&htim2, 1000);
-				}
-
-			//Czesc kodu odpowiedzialna za wobulator
-			} else if (strncmp(first, "$RLC_", 5) == 0) {
-				strncpy(second, data_rx + 5, 5);
-
-				if (strncmp(second, ".5KHZ", 5) == 0 ) {
+	        } else if (strncmp(second, "STOP_", 5) == 0) {
+	        	if (controling == 1) {
+					controling = 0;
+					prescaler = 999;
+					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+					//HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
+					HAL_ADC_Stop_DMA(&hadc1);
+					HAL_TIM_Base_Stop_IT(&htim10);
+	        	} else if (controling == 2) {
+					controling = 0;
+					prescaler = 999;
+					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
+					HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
+					HAL_ADC_Stop_DMA(&hadc1);
+					HAL_TIM_Base_Stop_IT(&htim10);
 					__HAL_TIM_SET_PRESCALER(&htim2, 19);
-				} else if (strncmp(second, "1KHZ_", 5) == 0) {
-					__HAL_TIM_SET_PRESCALER(&htim2, 9);
-				} else if (strncmp(second, "2KHZ_", 5) == 0) {
-					__HAL_TIM_SET_PRESCALER(&htim2, 4);
-				}
+	        	}
+	        } else if (strncmp(second, "10000", 5) == 0) {
+					*ptr_pwm = atoi(second) - 1;
+					if(controling == 1) {
+						__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+					}
+	        } else if (second[0] == '0') {
+					*ptr_pwm = atoi(second);
+					if (controling == 1) {
+						__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+					}
+	        } else if (strncmp(second, "RAKE_", 5) == 0) {
+					*ptr_pwm = 50*9999/100;
+					if (controling == 1) {
+						__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+						controling = 2;
+					} else if ( controling == 0) {
+						time = 0;
+						HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+						__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+						HAL_ADC_Start_DMA(&hadc1, Measure, 3);
+						HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
+						controling = 2;
+						__HAL_TIM_SET_AUTORELOAD(&htim2, 5000);
+					}
+	        } else if (strncmp(second, "FFT__", 5) == 0) {
 
-			}  else {
-				uart_tx_it(&huart2, "Wrong format. Try again.\n");
-			}
-		} else {
-			uart_tx_it(&huart2,
-					"Wrong format. Code should started with $SET_xxxxx.\n");
-		}
-		HAL_UART_Receive_IT(&huart2, data_rx, 9); //Turning on receiving
-		memset( data_rx, 0, strlen(data_rx));
-		memset( first, 0, strlen(first));
-		memset( second, 0, strlen(second));
+	        } else {
+	           uart_tx_it(&huart2, "Wrong format. Try again.\n");
+	        }
+
+	    } else if (strncmp(first, "$RLC_", 5) == 0) {
+	    	strncpy(second, data_rx + 5, 5);
+	        if(strncmp(second, ".5KHZ", 5) == 0 ) {
+	            __HAL_TIM_SET_PRESCALER(&htim2, 19);
+	        } else if (strncmp(second, "1KHZ_", 5) == 0) {
+	            __HAL_TIM_SET_PRESCALER(&htim2, 9);
+	        } else if (strncmp(second, "2KHZ_", 5) == 0) {
+	            __HAL_TIM_SET_PRESCALER(&htim2, 4);
+	        } else if (strncmp(second, "5KHZ_", 5) == 0) {
+	        	__HAL_TIM_SET_PRESCALER(&htim2, 1);
+	        } else if (strncmp(second, "10KHZ", 5) == 0) {
+	        	__HAL_TIM_SET_PRESCALER(&htim2, 0);
+	        }else {
+	            uart_tx_it(&huart2, "Wrong format. Try again.\n");
+	        }
+	    } else {
+	        uart_tx_it(&huart2,
+						"Wrong format. Code should started with $SET_xxxxx.\n");
+	    }
+		memset( data_rx, 0, strlen(data_rx) );
+		memset( first, 0, strlen(first) );
+		memset( second, 0, strlen(second) );
 	}
 }
 
@@ -561,7 +563,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
-	/* User can add his own implementation to report the HAL error return state */
+  /* User can add his own implementation to report the HAL error return state */
 
   /* USER CODE END Error_Handler_Debug */
 }
@@ -577,8 +579,8 @@ void Error_Handler(void)
 void assert_failed(uint8_t *file, uint32_t line)
 { 
   /* USER CODE BEGIN 6 */
-	/* User can add his own implementation to report the file name and line number,
-	 tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+/* User can add his own implementation to report the file name and line number,
+ tex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
   /* USER CODE END 6 */
 }
 #endif /* USE_FULL_ASSERT */
