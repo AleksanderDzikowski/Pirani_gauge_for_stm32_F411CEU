@@ -95,6 +95,7 @@ static void MX_USART2_UART_Init(void);
 static void MX_TIM10_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_ADC1_Init(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
@@ -136,6 +137,9 @@ int main(void)
   MX_TIM10_Init();
   MX_TIM2_Init();
   MX_ADC1_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 	uart_tx_it(&huart2, first_info);
 	uart_tx_it(&huart2, second_info);
@@ -215,6 +219,17 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* DMA2_Stream0_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
 }
 
 /**
@@ -414,11 +429,6 @@ static void MX_DMA_Init(void)
   /* DMA controller clock enable */
   __HAL_RCC_DMA2_CLK_ENABLE();
 
-  /* DMA interrupt init */
-  /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
-
 }
 
 /**
@@ -449,7 +459,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		 Pwm_per_cent = (float) set_pwm/9999 * 100.0f;
 		 sprintf(data_tx, "%1.3f\t%1.3f\t%f\t%f\t%f\n", Voltage[0], Voltage[1], Current, Power, Pwm_per_cent); */
 
-		sprintf(data_tx, "%d\t%d\n", Measure[0], Measure[1]);
+		sprintf(data_tx, "%d\t%d\n", Measure[0], Measure[1], Measure[2]);
 		uart_tx_it(&huart2, data_tx);
 		if (controling == 2 && prescaler > 0 && arr != 0) {
 			__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
@@ -478,6 +488,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 	            	time = 0;
 					uart_tx_it(&huart2, first_message); //Sending firs message with description
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+					HAL_ADC_Start(&hadc1);
 					HAL_ADC_Start_DMA(&hadc1, Measure, (uint32_t)3);
 					controling = 1;
 					prescaler = 999;
@@ -489,6 +500,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 					//HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
 					HAL_ADC_Stop_DMA(&hadc1);
+					HAL_ADC_Stop(&hadc1);
 					HAL_TIM_Base_Stop_IT(&htim10);
 	        	} else if (controling == 2) {
 					controling = 0;
@@ -496,6 +508,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 					HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
 					HAL_ADC_Stop_DMA(&hadc1);
+					HAL_ADC_Stop(&hadc1);
 					HAL_TIM_Base_Stop_IT(&htim10);
 					__HAL_TIM_SET_PRESCALER(&htim2, 19);
 	        	}
@@ -518,13 +531,15 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 						time = 0;
 						HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 						__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+						HAL_ADC_Start(&hadc1);
 						HAL_ADC_Start_DMA(&hadc1, Measure, 3);
 						HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
 						controling = 2;
 						__HAL_TIM_SET_AUTORELOAD(&htim2, 5000);
 					}
 	        } else if (strncmp(second, "FFT__", 5) == 0) {
-
+	        	HAL_ADC_Start(&hadc1);
+	        	HAL_ADC_Start_DMA(&hadc1, buffADC, 2*SIZE);
 	        } else {
 	           uart_tx_it(&huart2, "Wrong format. Try again.\n");
 	        }
