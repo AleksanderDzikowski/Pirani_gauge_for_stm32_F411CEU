@@ -486,13 +486,13 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 	        strncpy(second, data_rx + 5, 5);
 	        if (strncmp(second, "START", 5) == 0) {
 	            	time = 0;
-					uart_tx_it(&huart2, first_message); //Sending firs message with description
+					uart_tx_it(&huart2, first_message);
 					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 					HAL_ADC_Start(&hadc1);
 					HAL_ADC_Start_DMA(&hadc1, Measure, (uint32_t)3);
 					controling = 1;
 					prescaler = 999;
-					HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
+					HAL_TIM_Base_Start_IT(&htim10);
 	        } else if (strncmp(second, "STOP_", 5) == 0) {
 	        	if (controling == 1) {
 					controling = 0;
