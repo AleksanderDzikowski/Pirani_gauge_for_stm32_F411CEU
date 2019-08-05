@@ -60,12 +60,14 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define U_OUT_Pin GPIO_PIN_0
-#define U_OUT_GPIO_Port GPIOA
+#define Joystic_Pin GPIO_PIN_0
+#define Joystic_GPIO_Port GPIOA
 #define U_RESISTOR_Pin GPIO_PIN_1
 #define U_RESISTOR_GPIO_Port GPIOA
-#define U_REF_Pin GPIO_PIN_4
-#define U_REF_GPIO_Port GPIOA
+#define LowPass_Pin GPIO_PIN_4
+#define LowPass_GPIO_Port GPIOA
+#define OpAmp_OUT_Pin GPIO_PIN_0
+#define OpAmp_OUT_GPIO_Port GPIOB
 #define PWM_ADC_Pin GPIO_PIN_10
 #define PWM_ADC_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
