@@ -173,8 +173,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		Voltage[0] = (Measure[0]) * (3.3f / 4096.0f) * VOLATGE_DIVIDER * CALIBRE_REF; //
-		Voltage[1] = (Measure[1]) * (3.3f / 4096.0f) * CALIBRE_OPAMP; //
+		Voltage[0] = (Measure[0]) * (3.3f / 4096.0f) * VOLATGE_DIVIDER * CALIBRE_OPAMP; //
+		Voltage[1] = (Measure[1]) * (3.3f / 4096.0f) * CALIBRE_REF; //
 
 		Current = Voltage[1] / 10.0f;
 		Power = Voltage[0] * Current;
