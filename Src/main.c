@@ -26,6 +26,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "uart.h"
+#include "gauge.h"
+#include "UartRingbuffer.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -35,68 +37,26 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define SIZE 2048
-#define ADC1_DR_Address 0x4001204C;
-#define REFERENCE_RESISTOR 22.0
-//	!!DO NOT CHANGE!!
-#define VOLATGE_DIVIDER 3.15f ///Constant value from voltage divider; DO NOT CHANGE
-#define CALIBRE_OPAMP 1.1657f
-#define CALIBRE_REF  0.9427f
-//	!!DO NOT CHANGE!!
 
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
 /* USER CODE BEGIN PM */
-uint8_t first_message[] =
-		"Nr\t Time[s]\t U_Out[V]\t U_Resis[V]\t P[mW]\t I[mA]\t PWM[%]\n";
 
-uint8_t first_info[] =
-		{
-				"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxxxx\nwhere xxx is number between 0 and 10000. You should remembered type three digits for all case \nfor instance: 081125 for 81,125 %.\n" };
-uint8_t second_info[] =
-		{
-				"If you want to start measure type '$SET_START' and type '$SET_STOP_' for finish.\n" };
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
+
 DMA_HandleTypeDef hdma_adc1;
 
-TIM_HandleTypeDef htim2;
-TIM_HandleTypeDef htim10;
-
-UART_HandleTypeDef huart2;
-
 /* USER CODE BEGIN PV */
-volatile uint32_t time; // Current time in milisecond
-char data_rx[10] = { 0 }; //Table with received message
-char data_tx[100] = { 0 }; //Table with message to send
-char first[6], second[6]; // Tables for checking receive string
-volatile int16_t value = 0; // Variable using in receiving iterrupt
-volatile uint8_t controling = 0; //Variable to seting function
-volatile uint16_t set_pwm = 50 * 9999 / 100;
-volatile uint16_t *ptr_pwm = &set_pwm;
-volatile uint32_t number = 0;
-// Joistic Res_ref LowPass OpAmp_OUT
-volatile uint16_t Measure[2] = { 0 }; // Table contain measure
-volatile uint16_t prescaler = 999;
-volatile uint16_t *ptr_prescaler = &prescaler;
-volatile uint16_t arr = 9999;
-volatile uint16_t *ptr_arr = &arr;
-volatile float resistance;
-volatile float Voltage[2] = { 0 };
-volatile float Power = 0;
-volatile float Current = 0;
-volatile float Pwm_per_cent = 0;
-// [ PWM, Rmax, Ropt, Rmin ]
-const uint16_t resistance_map[7][4] = { { 1733, 26, 24, 22 },
-		{ 2533, 29, 26, 23 }, { 3333, 32, 28, 24 }, { 5000, 36, 31, 26 }, {
-				6667, 40, 34, 27 }, { 8333, 44, 37, 30 }, { 9999, 47, 40, 32 } };
-//Variable used in FFT
-volatile uint16_t buffADC[2 * SIZE] = { 0 };
-uint8_t State = 0; // 0 - wait, 1 - first half, 2 - second half
 
+extern UART_HandleTypeDef huart2;
+extern ADC_HandleTypeDef hadc1;
+extern TIM_HandleTypeDef htim2;
+extern TIM_HandleTypeDef htim2;
+extern volatile uint32_t time;
+//extern volatile MeasureData *dataStruct;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -158,36 +118,15 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-	HAL_UART_Transmit(&huart2, first_info,
-			(uint16_t) strlen(first_info), 1000);
-	HAL_UART_Transmit(&huart2, second_info,
-			(uint16_t) strlen(second_info), 1000);
-	HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
-	//HAL_UART_Receive_IT(&huart2, data_rx, 11); //Turning on receiving
-
-	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
-	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-	HAL_ADC_Start(&hadc1);
+  	uart_init();
+	adc_init();
+	pwm_init();
 
 	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-		Voltage[0] = (Measure[0]) * (3.3f / 4096.0f) * VOLATGE_DIVIDER * CALIBRE_OPAMP; //
-		Voltage[1] = (Measure[1]) * (3.3f / 4096.0f) * CALIBRE_REF; //
-
-		Current = Voltage[1] / 10.0f;
-		Power = Voltage[0] * Current;
-		//Pwm_per_cent = (float) set_pwm / 9999 * 100.0f;
-		if (Current <= 0) {
-			resistance = 0;
-		} else {
-			resistance = Voltage[0] / Current;
-		}
-
-
-		//sprintf(data_tx, "REF: %f\t HEAD: %f\n", Voltage[0], Voltage[1]);
-		//sprintf(data_tx, "REF: %d\t HEAD: %d\n", Measure[0], Measure[1]);
+		calc_data(&dataStruct, Measure[2]);
 	}
   /* USER CODE END 3 */
 }
@@ -284,7 +223,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_8;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
@@ -466,13 +405,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 			*ptr_prescaler = 49;
 			__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
 		}
-		sprintf(data_tx,
-						"PWM:%d\t ADC_OpAmp:%d\t V_OpAmp:%.4f\t ADC_Ref:%d\t V_Ref:%.4f\t I:%.4f\t P:%.4f\t R:%.4f\n",
-						*ptr_pwm, Measure[0], Voltage[0], Measure[1], Voltage[1],
-						Current, Power, resistance);
+		prepare_message_data(dataStruct, Measure[2]);
 		uart_tx_it(&huart2, data_tx);
 	}
 }
+
 void HAL_SYSTICK_Callback(void) {
 	time++;
 }
@@ -485,23 +422,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 			strncpy(second, data_rx + 5, 5);
 			if (strncmp(second, "START", 5) == 0 && controling != 1) {
 				time = 0;
-				uart_tx_it(&huart2, first_message);
-				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-				//HAL_ADC_Start(&hadc1);
-				HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, 2);
 				controling = 1;
 				prescaler = 999;
-				HAL_TIM_Base_Start_IT(&htim10);
-				uart_tx_it(&huart2, "Start measure\n");
+				start_measure_manual();
 			} else if (strncmp(second, "STOP_", 5) == 0 && controling != 0) {
 				if (controling == 1) {
 					controling = 0;
 					prescaler = 999;
-					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
-					//HAL_TIM_PWM_Stop(&htim2, TIM_CHANNEL_3);
-					HAL_ADC_Stop_DMA(&hadc1);
-					//HAL_ADC_Stop(&hadc1);
-					HAL_TIM_Base_Stop_IT(&htim10);
+					stop_measure_manual();
 				} else if (controling == 2) {
 					controling = 0;
 					prescaler = 999;
@@ -546,19 +474,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 
 		} else if (strncmp(first, "$RLC_", 5) == 0) {
 			strncpy(second, data_rx + 5, 5);
-			if (strncmp(second, ".5KHZ", 5) == 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, 19);
-			} else if (strncmp(second, "1KHZ_", 5) == 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, 9);
-			} else if (strncmp(second, "2KHZ_", 5) == 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, 4);
-			} else if (strncmp(second, "5KHZ_", 5) == 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, 1);
-			} else if (strncmp(second, "10KHZ", 5) == 0) {
-				__HAL_TIM_SET_PRESCALER(&htim2, 0);
-			} else {
-				uart_tx_it(&huart2, "Wrong format. Try again.\n");
-			}
+			freq_set(second);
 		} else {
 			uart_tx_it(&huart2,
 					"Wrong format. Code should started with $SET_xxxxx.\n");
