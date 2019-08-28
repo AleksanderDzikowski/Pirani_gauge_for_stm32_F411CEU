@@ -16,8 +16,8 @@ uint32_t time_uart = 150;
  * @param Pointer to string with data to send
  * */
 
-void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit(str_uart, (uint8_t*)text, strlen(text), time_uart);
+void uart_tx(UART_HandleTypeDef *str_uart, uint8_t *text) {
+	HAL_UART_Transmit(str_uart, text, strlen(text), time_uart);
 }
 
 /*
@@ -26,8 +26,8 @@ void uart_tx(UART_HandleTypeDef *str_uart, char *text) {
  * @param Pointer to string with data to send
  * */
 
-void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit_IT(str_uart, (uint8_t*)text, strlen(text));
+void uart_tx_it(UART_HandleTypeDef *str_uart, uint8_t *text) {
+	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
 }
 
 /*
@@ -35,8 +35,8 @@ void uart_tx_it(UART_HandleTypeDef *str_uart, char *text) {
  * @param Pointer to UART handle structure definition
  * @param Pointer to string with data to send
  * */
-void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
-	HAL_UART_Transmit_IT(str_uart, (uint8_t*)text, strlen(text));
+void uart_tx_dma(UART_HandleTypeDef *str_uart, uint8_t *text) {
+	HAL_UART_Transmit_IT(str_uart, text, strlen(text));
 }
 
 /*
@@ -45,7 +45,7 @@ void uart_tx_dma(UART_HandleTypeDef *str_uart, char *text) {
  * @param Pointer to string with data to send
  * */
 
-void uart_rx_it(UART_HandleTypeDef *str_uart, char *buff, char *buff_size) {
+void uart_rx_it(UART_HandleTypeDef *str_uart, uint8_t *buff, uint8_t *buff_size) {
 	HAL_StatusTypeDef status;
 	uint8_t current_char;
 	uint16_t char_counter = 0;

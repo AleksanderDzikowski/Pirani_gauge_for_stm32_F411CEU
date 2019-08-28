@@ -13,11 +13,14 @@
 
 #define SIZE_FFT_TABLE 2048
 
+#define TRUE 1
+#define FALSE 0
 
 //	!!DO NOT CHANGE!!
 #define VOLATGE_DIVIDER 3.67f ///Constant value from voltage divider; DO NOT CHANGE
-#define CALIBRE_OPAMP 1.0f
-#define CALIBRE_REF  1.0f
+#define CALIBRE_LOAD 1.12805f
+#define CALIBRE_REF  1.00119f
+#define CALIBRE_OPAMP 0.9976f
 //	!!DO NOT CHANGE!!
 
 extern UART_HandleTypeDef huart2;
@@ -35,6 +38,8 @@ typedef struct PIRANI_DATA {
 	volatile float resistanceLoad;
 } MeasureData;
 
+enum MEASURE_STATUS { STOP=0, RUN=1, WOBBUL = 2};
+
 MeasureData dataStruct;
 
 uint8_t *first_message;
@@ -48,16 +53,25 @@ uint8_t State; // 0 - wait, 1 - first half, 2 - second half
 
 volatile uint32_t time; // Current time in milisecond
 
-char data_rx[10]; //Table with received message
-char data_tx[150]; //Table with message to send
-char first[6], second[6]; // Tables for checking receive string
+uint8_t data_rx[10]; //Table with received message
+uint8_t data_tx[150]; //Table with message to send
+uint8_t recvd_data;
+uint32_t count;
+uint8_t reception_complete;
+size_t LEN_FIRST;
+size_t MAX_LEN_SECOND; //max length of second word
+uint8_t first[6], second[6]; // Tables for checking receive string
+uint8_t recv_comend[100];
+
 volatile int16_t value; // Variable using in receiving iterrupt
-volatile uint8_t controling; //Variable to seting function
+volatile enum MEASURE_STATUS status; //Variable to seting function
 volatile uint16_t set_pwm;
 volatile uint16_t *ptr_pwm;
 volatile uint32_t number;
 // Joistic Res_ref LowPass OpAmp_OUT
 uint16_t Measure[2]; // Table contain measure
+
+//variables for wobbulating function. This function changing value of PSC and ARR in timer
 volatile uint16_t prescaler;
 volatile uint16_t *ptr_prescaler;
 volatile uint16_t arr;
@@ -76,6 +90,11 @@ void calc_data(MeasureData *measure, uint16_t adc_value[2]);
 void prepare_message_data(MeasureData measure, uint16_t adc_value[2]);
 void start_measure_manual(void);
 void stop_measure_manual(void);
-void freq_set(char *);
+void start_wobbul_raw(void);
+void start_wobbul_run(void);
+void set_pulse_width(uint8_t );
+void stop_wobbul(void);
+void wobbuling(volatile enum MEASURE_STATUS, volatile uint16_t, volatile uint16_t );
+void freq_set(uint8_t *);
 
 #endif /* GAUGE_H_ */
