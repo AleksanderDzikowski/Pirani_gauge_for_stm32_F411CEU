@@ -42,7 +42,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include" />
-								</option>
+								<listOptionValue builtIn="false" value="../Middlewares/Third_Party/FatFs/src" /></option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1552716686" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__weak=&quot;__attribute__((weak))&quot;" />
 									<listOptionValue builtIn="false" value="__packed=&quot;__attribute__((__packed__))&quot;" />
@@ -62,7 +62,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include" />
-								</option>
+								<listOptionValue builtIn="false" value="../Middlewares/Third_Party/FatFs/src" /></option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.686405466" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__weak=&quot;__attribute__((weak))&quot;" />
 									<listOptionValue builtIn="false" value="__packed=&quot;__attribute__((__packed__))&quot;" />
@@ -103,7 +103,7 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<sourceEntries>
+					<sourceEntries><entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="startup" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Src" />
@@ -154,7 +154,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include" />
-								</option>
+								<listOptionValue builtIn="false" value="../Middlewares/Third_Party/FatFs/src" /></option>
 								<option id="gnu.c.compiler.option.preprocessor.def.symbols.1552716686" name="Defined symbols (-D)" superClass="gnu.c.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__weak=&quot;__attribute__((weak))&quot;" />
 									<listOptionValue builtIn="false" value="__packed=&quot;__attribute__((__packed__))&quot;" />
@@ -174,7 +174,7 @@
 									<listOptionValue builtIn="false" value="../Drivers/STM32F4xx_HAL_Driver/Inc/Legacy" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Device/ST/STM32F4xx/Include" />
 									<listOptionValue builtIn="false" value="../Drivers/CMSIS/Include" />
-								</option>
+								<listOptionValue builtIn="false" value="../Middlewares/Third_Party/FatFs/src" /></option>
 								<option id="gnu.cpp.compiler.option.preprocessor.def.symbols.1599349397" name="Defined symbols (-D)" superClass="gnu.cpp.compiler.option.preprocessor.def.symbols" useByScannerDiscovery="false" valueType="definedSymbols">
 									<listOptionValue builtIn="false" value="__weak=&quot;__attribute__((weak))&quot;" />
 									<listOptionValue builtIn="false" value="__packed=&quot;__attribute__((__packed__))&quot;" />
@@ -215,7 +215,7 @@
 							</tool>
 						</toolChain>
 					</folderInfo>
-					<sourceEntries>
+					<sourceEntries><entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Middlewares" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="startup" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Drivers" />
 						<entry flags="VALUE_WORKSPACE_PATH|RESOLVED" kind="sourcePath" name="Src" />

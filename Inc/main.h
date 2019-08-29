@@ -70,6 +70,8 @@ void Error_Handler(void);
 #define OpAmp_OUT_GPIO_Port GPIOB
 #define PWM_ADC_Pin GPIO_PIN_10
 #define PWM_ADC_GPIO_Port GPIOB
+#define SD_CS_Pin GPIO_PIN_4
+#define SD_CS_GPIO_Port GPIOB
 /* USER CODE BEGIN Private defines */
 
 /* USER CODE END Private defines */

@@ -10,6 +10,8 @@
 
 #include <stdio.h>
 #include "main.h"
+#include "fatfs.h"
+#include "fatfs_sd.h"
 
 #define SIZE_FFT_TABLE 2048
 
@@ -82,6 +84,19 @@ const uint16_t resistance_map[7][4];
 
 const float valueOfBit; //Voltage value of 1b -> 3.3/4096
 
+//FATFS variable
+FATFS fs; // file system
+FIL file; // file
+FRESULT fresult; // to store the result
+char buffer[1024]; // to store data
+
+UINT br, bw; //file read/write count
+
+//capacity related variables
+FATFS *pfs;
+DWORD fre_clust;
+uint32_t total, free_space;
+
 
 void uart_init(void);
 void pwm_init(void);
@@ -96,5 +111,8 @@ void set_pulse_width(uint8_t );
 void stop_wobbul(void);
 void wobbuling(volatile enum MEASURE_STATUS, volatile uint16_t, volatile uint16_t );
 void freq_set(uint8_t *);
+uint8_t buff_size (uint8_t *);
+void bufclear(void);
+
 
 #endif /* GAUGE_H_ */

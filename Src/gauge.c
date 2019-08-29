@@ -64,6 +64,19 @@ const uint16_t resistance_map[7][4] = { { 1733, 26, 24, 22 },
 				6667, 40, 34, 27 }, { 8333, 44, 37, 30 }, { 9999, 47, 40, 32 } };
 const float valueOfBit = 0.0008056640625;
 
+//FATFS variable
+FATFS fs; // file system
+FIL file; // file
+FRESULT fresult; // to store the result
+char buffer[1024]; // to store data
+
+UINT br, bw; //file read/write count
+
+//capacity related variables
+FATFS *pfs;
+DWORD fre_clust;
+uint32_t total, free_space;
+
 void uart_init(void) {
 	HAL_UART_Transmit(&huart2, first_info, (uint16_t) strlen(first_info), HAL_MAX_DELAY);
 	HAL_UART_Receive_IT(&huart2, &recvd_data, 1); //Turning on receiving
@@ -111,10 +124,11 @@ void calc_data(MeasureData *measure, uint16_t adc_value[2]) {
 }
 
 void prepare_message_data(MeasureData measure, uint16_t adc_value[2]) {
-	sprintf(data_tx, "%d\t %d\t %.4f\t %.4f\t %d\t %.4f\t %.4f\t %.4f\t %.4f\n",
+	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f%.3f%.3f\n",
 			*ptr_pwm, Measure[0], measure.voltageRawOpamp, measure.voltageLoad,
 			Measure[1], measure.voltageReferenceResistor, measure.current,
 			measure.powerLoad, measure.resistanceLoad);
+
 }
 
 void start_measure_manual(void) {
@@ -123,12 +137,15 @@ void start_measure_manual(void) {
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, 2);
 	HAL_TIM_Base_Start_IT(&htim10);
+	fresult = f_open(&file, "measure.csv", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
 }
 
 void stop_measure_manual(void) {
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 	HAL_ADC_Stop_DMA(&hadc1);
 	HAL_TIM_Base_Stop_IT(&htim10);
+	fresult = f_close(&file);
+
 }
 
 void start_wobbul_raw(void) {
@@ -141,7 +158,7 @@ void start_wobbul_raw(void) {
 	__HAL_TIM_SET_AUTORELOAD(&htim2, 5000);
 }
 
-void wobbuling(volatile enum STAT, volatile uint16_t PRESCALER, volatile uint16_t ARR){
+void wobbuling(volatile enum MEASURE_STATUS STAT, volatile uint16_t PRESCALER, volatile uint16_t ARR){
 	if (status == WOBBUL && prescaler > 0 && arr != 0) {
 		__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
 		*ptr_prescaler -= 1;
@@ -185,5 +202,17 @@ void freq_set(uint8_t *str_correct) {
 		__HAL_TIM_SET_PRESCALER(&htim2, 0);
 	} else {
 		uart_tx_it(&huart2, "Wrong format. Try again.\n");
+	}
+}
+
+uint8_t buff_size (uint8_t *buff) {
+	int i = 0;
+	while (*buff++ != '\0') i++;
+	return i;
+}
+
+void bufclear(void) {
+	for (uint16_t i = 0; i <1024; i++) {
+		buffer[i] = '\0';
 	}
 }
