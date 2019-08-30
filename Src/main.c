@@ -140,9 +140,17 @@ int main(void)
 	//Check card capacity
 	f_getfree("", &fre_clust, &pfs);
 	total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-	sprintf(buffer, "SD CARD Total Size: \t%lu\n", free_space);
+	sprintf(buffer, "SD CARD Total Size: \t%lu\n", total);
 	uart_tx(&huart2, buffer);
 	bufclear();
+	free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
+	sprintf(buffer, "SD CARD Free space:\t%lu\n", free_space);
+	uart_tx(&huart2, buffer);
+	bufclear();
+
+	while( ( fresult = f_open(&file,"measure.csv",FA_OPEN_ALWAYS | FA_READ | FA_WRITE )  ) != FR_OK );
+	uart_tx(&huart2, "measure.csv created\n");
+	f_close(&file);
 
 	while (1) {
     /* USER CODE END WHILE */
