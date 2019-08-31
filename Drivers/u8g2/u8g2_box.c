@@ -39,6 +39,7 @@
   draw a filled box
   restriction: does not work for w = 0 or h = 0
 */
+
 void u8g2_DrawBox(u8g2_t *u8g2, u8g2_uint_t x, u8g2_uint_t y, u8g2_uint_t w, u8g2_uint_t h)
 {
 #ifdef U8G2_WITH_INTERSECTION

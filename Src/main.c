@@ -29,6 +29,7 @@
 #include "uart.h"
 #include "gauge.h"
 #include "fatfs_sd.h"
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -133,35 +134,45 @@ int main(void)
 	pwm_init();
 
 	//Mount SD Card
-	fresult = f_mount(&fs, "", 0);
-	if (fresult != FR_OK) uart_tx(&huart2, "error in mounting SD CARD...\n");
-	else uart_tx(&huart2, "SD CARD mounted successfully...\n");
+	fresult = f_mount(&fs, "", 1);
 
-	//Check card capacity
-	f_getfree("", &fre_clust, &pfs);
-	total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-	sprintf(buffer, "SD CARD Total Size: \t%lu\n", total);
-	uart_tx(&huart2, buffer);
-	bufclear();
-	free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
-	sprintf(buffer, "SD CARD Free space:\t%lu\n", free_space);
-	uart_tx(&huart2, buffer);
-	bufclear();
+	if (fresult != FR_OK) {
+		uart_tx(&huart2, "error in mounting SD CARD...\n");
+	}
+	else {
+		uart_tx(&huart2, "SD CARD mounted successfully...\n");
+		//Check card capacity
+		f_getfree("", &fre_clust, &pfs);
+		total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+		sprintf(buffer, "SD CARD Total Size: \t%lu\n", total);
+		uart_tx(&huart2, buffer);
+		bufclear();
+		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
+		sprintf(buffer, "SD CARD Free space:\t%lu\n", free_space);
+		uart_tx(&huart2, buffer);
+		bufclear();
+		while( ( fresult = f_open(&file,"measure.csv",FA_OPEN_ALWAYS | FA_READ | FA_WRITE )  ) != FR_OK );
+		uart_tx(&huart2, "measure.csv created\n");
+		f_close(&file);
+	}
 
-	while( ( fresult = f_open(&file,"measure.csv",FA_OPEN_ALWAYS | FA_READ | FA_WRITE )  ) != FR_OK );
-	uart_tx(&huart2, "measure.csv created\n");
-	f_close(&file);
+
+
+
+
+
+	//u8g2_UserInterfaceMessage()
+
 
 	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
-		calc_data(&dataStruct, Measure[2]);
+		calc_data(&dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
 	}
   /* USER CODE END 3 */
 }
-
 
 /**
   * @brief System Clock Configuration
@@ -461,14 +472,24 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, LCD_BL_Pin|LCD_RST_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : SD_CS_Pin */
-  GPIO_InitStruct.Pin = SD_CS_Pin;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, SD_CS_Pin|LCD_CS_Pin|LCD_DC_Pin, GPIO_PIN_RESET);
+
+  /*Configure GPIO pins : LCD_BL_Pin LCD_RST_Pin */
+  GPIO_InitStruct.Pin = LCD_BL_Pin|LCD_RST_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(SD_CS_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : SD_CS_Pin LCD_CS_Pin LCD_DC_Pin */
+  GPIO_InitStruct.Pin = SD_CS_Pin|LCD_CS_Pin|LCD_DC_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 }
 
@@ -478,12 +499,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
 		number++;
 		wobbuling(status, prescaler, arr);
-		prepare_message_data(dataStruct, Measure[2]);
-		size_t len = strlen(data_tx);
-		strncpy(buffer, data_tx, len);
-		fresult = f_puts( buffer, &file);
+		prepare_message_data(dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
 		uart_tx_it(&huart2, data_tx);
-		bufclear();
+		if(fresult != FR_OK) {
+			size_t len = strlen(data_tx);
+			strncpy(buffer, data_tx, len);
+			fresult = f_puts( buffer, &file);
+			bufclear();
+		}
 	}
 }
 
@@ -513,10 +536,12 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 			// to STOP
 			} else if (strncmp(second, "10000", MAX_LEN_SECOND) == 0) {
 				*ptr_pwm = atoi(second) - 1;
-				set_pulse_width(*ptr_pwm);
+				//set_pulse_width(*ptr_pwm);
+				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 			} else if (second[0] == '0') {
 				*ptr_pwm = atoi(second);
-				set_pulse_width(*ptr_pwm);
+				//set_pulse_width(*ptr_pwm);
+				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 			} else if (strncmp(second, "WOBB", MAX_LEN_SECOND) == 0) {
 				*ptr_pwm = 50 * 9999 / 100; // set PWM at 50%
 				if (status == RUN) {

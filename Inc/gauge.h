@@ -19,11 +19,33 @@
 #define FALSE 0
 
 //	!!DO NOT CHANGE!!
-#define VOLATGE_DIVIDER 3.67f ///Constant value from voltage divider; DO NOT CHANGE
-#define CALIBRE_LOAD 1.12805f
-#define CALIBRE_REF  1.00119f
-#define CALIBRE_OPAMP 0.9976f
+#define VOLATGE_DIVIDER  (3.67f) ///Constant value from voltage divider; DO NOT CHANGE
+#define VOLATGE_DIVIDER_NUMERATOR   (367) ///Constant value from voltage divider; DO NOT CHANGE
+#define VOLATGE_DIVIDER_DENOMINATOR (100)
+
+#define CALIBRE_LOAD (1.0f)
+#define CALIBRE_LOAD_NUMERATOR   (1)
+#define CALIBRE_LOAD_DENOMINATOR (1)
+
+#define CALIBRE_REF  (1.00119f)
+#define CALIBRE_REF_NUMERATOR   (100119)
+#define CALIBRE_REF_DENOMINATOR (100000)
+
+#define CALIBRE_OPAMP (0.9976f)
+#define CALIBRE_OPAMP_NUMERATOR   (9976)
+#define CALIBRE_OPAMP_DENOMINATOR (10000)
+
+#define ERROR_VOLTAGE (0.187)
+
+#define VALUE_OF_BIT_NUMERATOR   8056640625
+#define VALUE_OF_BIT_DENOMINATOR 10000000000000
 //	!!DO NOT CHANGE!!
+
+#define NUMBERS_ADC_CHANNELS 2
+#define OPAMP_LOCATION 0
+#define REFERENCE_LOCATION 1
+#define RC_LOCATION 3
+#define JOYSTIC_LOCATION 4
 
 extern UART_HandleTypeDef huart2;
 extern ADC_HandleTypeDef hadc1;
@@ -31,7 +53,7 @@ extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim10;
 
 typedef struct PIRANI_DATA {
-	volatile uint16_t adcData[2];
+	volatile uint16_t adcData[NUMBERS_ADC_CHANNELS];
 	volatile float voltageLoad;
 	volatile float voltageReferenceResistor;
 	volatile float voltageRawOpamp;
@@ -48,10 +70,6 @@ uint8_t *first_message;
 uint8_t *first_info;
 
 const float referenceResistor;
-
-//Variable used in FFT
-volatile uint16_t buffADC[2 * SIZE_FFT_TABLE];
-uint8_t State; // 0 - wait, 1 - first half, 2 - second half
 
 volatile uint32_t time; // Current time in milisecond
 
@@ -71,7 +89,7 @@ volatile uint16_t set_pwm;
 volatile uint16_t *ptr_pwm;
 volatile uint32_t number;
 // Joistic Res_ref LowPass OpAmp_OUT
-uint16_t Measure[2]; // Table contain measure
+uint16_t Measure[NUMBERS_ADC_CHANNELS]; // Table contain measure
 
 //variables for wobbulating function. This function changing value of PSC and ARR in timer
 volatile uint16_t prescaler;
@@ -101,8 +119,8 @@ uint32_t total, free_space;
 void uart_init(void);
 void pwm_init(void);
 void adc_init(void);
-void calc_data(MeasureData *measure, uint16_t adc_value[2]);
-void prepare_message_data(MeasureData measure, uint16_t adc_value[2]);
+void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]);
+void prepare_message_data(MeasureData measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]);
 void start_measure_manual(void);
 void stop_measure_manual(void);
 void start_wobbul_raw(void);

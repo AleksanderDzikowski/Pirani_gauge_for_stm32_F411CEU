@@ -30,11 +30,7 @@ uint8_t *pwm_message = {"Initialize PWM: "};
 uint8_t *status_confirm = "Status Confirm!\n";
 uint8_t *status_unconfirm = "Status Unconfirm!\n";
 
-//For FFT usage
-volatile uint16_t buffADC[2 * SIZE_FFT_TABLE] = { 0 };
-uint8_t State = 0; // 0 - wait, 1 - first half, 2 - second half
-
-const float referenceResistor = 10.0f;
+const float referenceResistor = 10.1f;
 
 volatile uint32_t time; // Current time in milisecond
 uint8_t data_rx[10] = { 0 }; //Table with received message
@@ -52,7 +48,7 @@ volatile enum MEASURE_STATUS status = STOP;
 size_t LEN_FIRST = 5;
 size_t MAX_LEN_SECOND = 5; //max length of second word
 // Joistic Res_ref LowPass OpAmp_OUT
-uint16_t Measure[2] = { 0 }; // Table contain measure
+uint16_t Measure[NUMBERS_ADC_CHANNELS] = { 0 }; // Table contain measure
 volatile uint16_t prescaler = 999;
 volatile uint16_t *ptr_prescaler = &prescaler;
 volatile uint16_t arr = 9999;
@@ -62,6 +58,7 @@ volatile uint16_t *ptr_arr = &arr;
 const uint16_t resistance_map[7][4] = { { 1733, 26, 24, 22 },
 		{ 2533, 29, 26, 23 }, { 3333, 32, 28, 24 }, { 5000, 36, 31, 26 }, {
 				6667, 40, 34, 27 }, { 8333, 44, 37, 30 }, { 9999, 47, 40, 32 } };
+
 const float valueOfBit = 0.0008056640625;
 
 //FATFS variable
@@ -103,15 +100,17 @@ void adc_init(void) {
 	}
 }
 
-void calc_data(MeasureData *measure, uint16_t adc_value[2]) {
-	measure->adcData[0] = Measure[0];
-	measure->adcData[1] = Measure[1];
+void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
+	//measure->adcData[0] = Measure[OPAMP_LOCATION];
+	//measure->adcData[1] = Measure[REFERENCE_LOCATION];
 
-	measure->voltageLoad = Measure[0] * valueOfBit * VOLATGE_DIVIDER
-			* CALIBRE_LOAD;
-	measure->voltageRawOpamp = Measure[0] * valueOfBit * CALIBRE_OPAMP;
-	measure->voltageReferenceResistor = Measure[1] * valueOfBit
-			* CALIBRE_REF;
+	measure->voltageLoad = Measure[OPAMP_LOCATION] * valueOfBit * VOLATGE_DIVIDER
+			* CALIBRE_LOAD * CALIBRE_OPAMP - ERROR_VOLTAGE;
+
+
+	measure->voltageRawOpamp = Measure[OPAMP_LOCATION] * valueOfBit * CALIBRE_OPAMP;
+
+	measure->voltageReferenceResistor = Measure[REFERENCE_LOCATION] * valueOfBit * CALIBRE_REF;
 
 	measure->current = measure->voltageReferenceResistor / referenceResistor;
 	measure->powerLoad = measure->voltageLoad * measure->current;
@@ -124,9 +123,9 @@ void calc_data(MeasureData *measure, uint16_t adc_value[2]) {
 }
 
 void prepare_message_data(MeasureData measure, uint16_t adc_value[2]) {
-	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f%.3f%.3f\n",
-			*ptr_pwm, Measure[0], measure.voltageRawOpamp, measure.voltageLoad,
-			Measure[1], measure.voltageReferenceResistor, measure.current,
+	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f;%.3f;%.3f\n",
+			*ptr_pwm, Measure[OPAMP_LOCATION], measure.voltageRawOpamp, measure.voltageLoad,
+			Measure[REFERENCE_LOCATION], measure.voltageReferenceResistor, measure.current,
 			measure.powerLoad, measure.resistanceLoad);
 
 }
@@ -135,16 +134,18 @@ void start_measure_manual(void) {
 
 	uart_tx_it(&huart2, first_message);
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, 2);
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, NUMBERS_ADC_CHANNELS);
 	HAL_TIM_Base_Start_IT(&htim10);
-	fresult = f_open(&file, "measure.csv", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
+	if (fresult != FR_OK)
+		fresult = f_open(&file, "measure.csv", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
 }
 
 void stop_measure_manual(void) {
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 	HAL_ADC_Stop_DMA(&hadc1);
 	HAL_TIM_Base_Stop_IT(&htim10);
-	fresult = f_close(&file);
+	if (fresult != FR_OK)
+		fresult = f_close(&file);
 
 }
 
@@ -152,7 +153,7 @@ void start_wobbul_raw(void) {
 	HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 	HAL_ADC_Start(&hadc1);
-	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, 2);
+	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, NUMBERS_ADC_CHANNELS);
 	HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
 	status = WOBBUL;
 	__HAL_TIM_SET_AUTORELOAD(&htim2, 5000);
