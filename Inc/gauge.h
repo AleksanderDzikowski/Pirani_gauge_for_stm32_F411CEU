@@ -20,32 +20,20 @@
 
 //	!!DO NOT CHANGE!!
 #define VOLATGE_DIVIDER  (3.67f) ///Constant value from voltage divider; DO NOT CHANGE
-#define VOLATGE_DIVIDER_NUMERATOR   (367) ///Constant value from voltage divider; DO NOT CHANGE
-#define VOLATGE_DIVIDER_DENOMINATOR (100)
-
 #define CALIBRE_LOAD (1.0f)
-#define CALIBRE_LOAD_NUMERATOR   (1)
-#define CALIBRE_LOAD_DENOMINATOR (1)
-
+#define CALIBRE_LOAD_MEAN (1.01924f)
+#define CALIBRE_LOAD_LAST (1.02f)
+#define CALIBRE_LOAD_POLYNOMIAL_SQUARE (0.0000035231f)
+#define CALIBRE_LOAD_POLYNOMIAL_LINEAR (1.06661f)
 #define CALIBRE_REF  (1.00119f)
-#define CALIBRE_REF_NUMERATOR   (100119)
-#define CALIBRE_REF_DENOMINATOR (100000)
-
-#define CALIBRE_OPAMP (0.9976f)
-#define CALIBRE_OPAMP_NUMERATOR   (9976)
-#define CALIBRE_OPAMP_DENOMINATOR (10000)
-
-#define ERROR_VOLTAGE (0.187)
-
-#define VALUE_OF_BIT_NUMERATOR   8056640625
-#define VALUE_OF_BIT_DENOMINATOR 10000000000000
+#define CALIBRE_OPAMP (0.997659f)
+#define ERROR_VOLTAGE (0.18f)
+#define ERROR_CURRENT (0.00083f)
 //	!!DO NOT CHANGE!!
 
 #define NUMBERS_ADC_CHANNELS 2
 #define OPAMP_LOCATION 0
 #define REFERENCE_LOCATION 1
-#define RC_LOCATION 3
-#define JOYSTIC_LOCATION 4
 
 extern UART_HandleTypeDef huart2;
 extern ADC_HandleTypeDef hadc1;
@@ -63,6 +51,7 @@ typedef struct PIRANI_DATA {
 } MeasureData;
 
 enum MEASURE_STATUS { STOP=0, RUN=1, WOBBUL = 2};
+enum DISK_STATUS {DISK_OK = 0, DISK_ERROR = 1};
 
 MeasureData dataStruct;
 
@@ -109,7 +98,7 @@ FRESULT fresult; // to store the result
 char buffer[1024]; // to store data
 
 UINT br, bw; //file read/write count
-
+volatile int name_number;
 //capacity related variables
 FATFS *pfs;
 DWORD fre_clust;

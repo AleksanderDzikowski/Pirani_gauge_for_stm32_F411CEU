@@ -65,7 +65,7 @@ extern ADC_HandleTypeDef hadc1;
 extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim2;
 extern volatile uint32_t time;
-
+extern volatile enum DISK_STATUS card_status;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -131,7 +131,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
 	uart_init();
 	adc_init();
-	pwm_init();
+	//pwm_init();
 
 	//Mount SD Card
 	fresult = f_mount(&fs, "", 1);
@@ -140,6 +140,7 @@ int main(void)
 		uart_tx(&huart2, "error in mounting SD CARD...\n");
 	}
 	else {
+		card_status = DISK_OK;
 		uart_tx(&huart2, "SD CARD mounted successfully...\n");
 		//Check card capacity
 		f_getfree("", &fre_clust, &pfs);
@@ -155,14 +156,6 @@ int main(void)
 		uart_tx(&huart2, "measure.csv created\n");
 		f_close(&file);
 	}
-
-
-
-
-
-
-	//u8g2_UserInterfaceMessage()
-
 
 	while (1) {
     /* USER CODE END WHILE */
@@ -240,6 +233,7 @@ static void MX_ADC1_Init(void)
   /* USER CODE END ADC1_Init 0 */
 
   ADC_ChannelConfTypeDef sConfig = {0};
+  ADC_InjectionConfTypeDef sConfigInjected = {0};
 
   /* USER CODE BEGIN ADC1_Init 1 */
 
@@ -276,6 +270,21 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /** Configures for the selected ADC injected channel its corresponding rank in the sequencer and its sample time 
+  */
+  sConfigInjected.InjectedChannel = ADC_CHANNEL_0;
+  sConfigInjected.InjectedRank = 1;
+  sConfigInjected.InjectedNbrOfConversion = 1;
+  sConfigInjected.InjectedSamplingTime = ADC_SAMPLETIME_480CYCLES;
+  sConfigInjected.ExternalTrigInjecConvEdge = ADC_EXTERNALTRIGINJECCONVEDGE_NONE;
+  sConfigInjected.ExternalTrigInjecConv = ADC_INJECTED_SOFTWARE_START;
+  sConfigInjected.AutoInjectedConv = DISABLE;
+  sConfigInjected.InjectedDiscontinuousConvMode = DISABLE;
+  sConfigInjected.InjectedOffset = 0;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
   {
     Error_Handler();
   }
@@ -501,7 +510,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		wobbuling(status, prescaler, arr);
 		prepare_message_data(dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
 		uart_tx_it(&huart2, data_tx);
-		if(fresult != FR_OK) {
+		if (card_status == DISK_OK) {
 			size_t len = strlen(data_tx);
 			strncpy(buffer, data_tx, len);
 			fresult = f_puts( buffer, &file);
@@ -522,13 +531,16 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 			strncpy(second, data_rx + LEN_FIRST, MAX_LEN_SECOND); //
 			if (strncmp(second, "START", strlen("START")) == 0 && status != RUN) {
 				status = RUN;
+
 				prescaler = 999;
+				pwm_init();
 				start_measure_manual();
 			} else if (strncmp(second, "STOP", MAX_LEN_SECOND) == 0) {
 				if (status == RUN) {
 					status = STOP;
 					prescaler = 999;
 					stop_measure_manual();
+
 				} else if (status == WOBBUL) {
 					prescaler = 999;
 					stop_wobbul();

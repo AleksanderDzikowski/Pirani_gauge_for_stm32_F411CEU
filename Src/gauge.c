@@ -16,7 +16,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 
 uint8_t *first_message =
-	{"Start measure\nPWM\t ADC_OpAmp\t V_OpAmp\t V_Load\t ADC_Ref\t V_Ref\t I\t P\t R\n"};
+	{"Start measure\nPWM;ADC_OpAmp;V_OpAmp;V_Load;ADC_Ref;V_Ref;I;P;R\n"};
 
 uint8_t *first_info =
 {"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxxxx where xxx is number between 0 and 10000. You should remembered type three digits for all case "
@@ -27,23 +27,25 @@ uint8_t *first_info =
 uint8_t *adc_message = {"Initialize ADC: "};
 uint8_t *pwm_message = {"Initialize PWM: "};
 
-uint8_t *status_confirm = "Status Confirm!\n";
-uint8_t *status_unconfirm = "Status Unconfirm!\n";
+uint8_t *status_confirm = "Status confired!\n";
+uint8_t *status_unconfirm = "Status Not confirmed!\n";
 
-const float referenceResistor = 10.1f;
+const float referenceResistor = 9.9899f;
 
 volatile uint32_t time; // Current time in milisecond
 uint8_t data_rx[10] = { 0 }; //Table with received message
 uint8_t data_tx[150] = { 0 }; //Table with message to send
-//uint8_t first[6], second[6]; // Tables for checking receive string
+uint8_t first[6], second[6]; // Tables for checking receive string
 volatile int16_t value = 0; // Variable using in receiving iterrupt
-volatile uint8_t controling = 0; //Variable to seting function
-volatile uint16_t set_pwm = 50 * 9999 / 100;
+volatile uint16_t set_pwm = 5 * 9999 / 100;
 volatile uint16_t *ptr_pwm = &set_pwm;
 volatile uint32_t number = 0;
 uint8_t reception_complete = FALSE;
 uint32_t count = 0;
 volatile enum MEASURE_STATUS status = STOP;
+volatile enum DISK_STATUS card_status = DISK_ERROR;
+volatile int name_number = 1;
+volatile char name_file[14] = "measure_1.csv";
 
 size_t LEN_FIRST = 5;
 size_t MAX_LEN_SECOND = 5; //max length of second word
@@ -104,15 +106,37 @@ void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 	//measure->adcData[0] = Measure[OPAMP_LOCATION];
 	//measure->adcData[1] = Measure[REFERENCE_LOCATION];
 
-	measure->voltageLoad = Measure[OPAMP_LOCATION] * valueOfBit * VOLATGE_DIVIDER
-			* CALIBRE_LOAD * CALIBRE_OPAMP - ERROR_VOLTAGE;
-
-
 	measure->voltageRawOpamp = Measure[OPAMP_LOCATION] * valueOfBit * CALIBRE_OPAMP;
+
+
+	if ( *ptr_pwm >= 8499)
+		measure->voltageLoad = CALIBRE_LOAD_POLYNOMIAL_SQUARE *
+					((measure->voltageRawOpamp * VOLATGE_DIVIDER)*(measure->voltageRawOpamp * VOLATGE_DIVIDER))
+					+ (CALIBRE_LOAD_POLYNOMIAL_LINEAR * (measure->voltageRawOpamp * VOLATGE_DIVIDER));
+	else if ( *ptr_pwm <= 1499 )
+		measure->voltageLoad = CALIBRE_LOAD_POLYNOMIAL_SQUARE *
+							( (measure->voltageRawOpamp * VOLATGE_DIVIDER)*(measure->voltageRawOpamp * VOLATGE_DIVIDER) -ERROR_VOLTAGE)
+							+ (CALIBRE_LOAD_POLYNOMIAL_LINEAR * (measure->voltageRawOpamp * VOLATGE_DIVIDER) -ERROR_VOLTAGE);
+	else if(*ptr_pwm >= 9599)
+		measure->voltageLoad = (CALIBRE_LOAD_POLYNOMIAL_SQUARE *
+							((measure->voltageRawOpamp * VOLATGE_DIVIDER)*(measure->voltageRawOpamp * VOLATGE_DIVIDER))
+							+ (CALIBRE_LOAD_POLYNOMIAL_LINEAR * (measure->voltageRawOpamp * VOLATGE_DIVIDER))) * CALIBRE_LOAD_LAST;
+	else
+		measure->voltageLoad = measure->voltageRawOpamp * VOLATGE_DIVIDER * CALIBRE_LOAD_MEAN - ERROR_VOLTAGE;
+
+
+	/*measure->voltageLoad = CALIBRE_LOAD_POLYNOMIAL_SQUARE *
+			(( measure->voltageRawOpamp * VOLATGE_DIVIDER )*( (measure->voltageRawOpamp) * VOLATGE_DIVIDER))
+			+ (CALIBRE_LOAD_POLYNOMIAL_LINEAR * ( (measure->voltageRawOpamp) * VOLATGE_DIVIDER));
+	*/
+
+
+
+
 
 	measure->voltageReferenceResistor = Measure[REFERENCE_LOCATION] * valueOfBit * CALIBRE_REF;
 
-	measure->current = measure->voltageReferenceResistor / referenceResistor;
+	measure->current = (measure->voltageReferenceResistor / referenceResistor) - ERROR_CURRENT;
 	measure->powerLoad = measure->voltageLoad * measure->current;
 
 	if (measure->current <= 0) {
@@ -122,7 +146,7 @@ void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 	}
 }
 
-void prepare_message_data(MeasureData measure, uint16_t adc_value[2]) {
+void prepare_message_data(MeasureData measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f;%.3f;%.3f\n",
 			*ptr_pwm, Measure[OPAMP_LOCATION], measure.voltageRawOpamp, measure.voltageLoad,
 			Measure[REFERENCE_LOCATION], measure.voltageReferenceResistor, measure.current,
@@ -136,7 +160,7 @@ void start_measure_manual(void) {
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, NUMBERS_ADC_CHANNELS);
 	HAL_TIM_Base_Start_IT(&htim10);
-	if (fresult != FR_OK)
+	if (card_status == DISK_OK)
 		fresult = f_open(&file, "measure.csv", FA_OPEN_ALWAYS | FA_READ | FA_WRITE);
 }
 
@@ -144,7 +168,7 @@ void stop_measure_manual(void) {
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, 0);
 	HAL_ADC_Stop_DMA(&hadc1);
 	HAL_TIM_Base_Stop_IT(&htim10);
-	if (fresult != FR_OK)
+	if (card_status == DISK_OK)
 		fresult = f_close(&file);
 
 }
