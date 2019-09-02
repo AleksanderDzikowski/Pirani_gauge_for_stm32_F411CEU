@@ -7,6 +7,7 @@
 
 #include "gauge.h"
 #include <stdio.h>
+#include <math.h>
 #include "uart.h"
 #include "main.h"
 
@@ -16,7 +17,7 @@ TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
 
 uint8_t *first_message =
-	{"Start measure\nPWM;ADC_OpAmp;V_OpAmp;V_Load;ADC_Ref;V_Ref;I;P;R\n"};
+	{"Start measure\nPWM;ADC_OpAmp;V_OpAmp;V_Load;ADC_Ref;V_Ref;I;P;R;p\n"};
 
 uint8_t *first_info =
 {"Type code to set value in per cent to PWM. Correct code format look's like this: $SET_xxxxx where xxx is number between 0 and 10000. You should remembered type three digits for all case "
@@ -42,7 +43,7 @@ volatile uint16_t *ptr_pwm = &set_pwm;
 volatile uint32_t number = 0;
 uint8_t reception_complete = FALSE;
 uint32_t count = 0;
-volatile enum MEASURE_STATUS status = STOP;
+volatile enum MEASURE_STATUS measure_status = STOP;
 volatile enum DISK_STATUS card_status = DISK_ERROR;
 volatile int name_number = 1;
 volatile char name_file[14] = "measure_1.csv";
@@ -56,10 +57,18 @@ volatile uint16_t *ptr_prescaler = &prescaler;
 volatile uint16_t arr = 9999;
 volatile uint16_t *ptr_arr = &arr;
 
-// [ PWM, Rmax, Ropt, Rmin ]
-const uint16_t resistance_map[7][4] = { { 1733, 26, 24, 22 },
-		{ 2533, 29, 26, 23 }, { 3333, 32, 28, 24 }, { 5000, 36, 31, 26 }, {
-				6667, 40, 34, 27 }, { 8333, 44, 37, 30 }, { 9999, 47, 40, 32 } };
+volatile enum AUTO_MEASURE algorithm_status = STOP;
+const double pressure_multiplicative[] = {0.42372, 0.47720, 0.5137};
+const double pressure_numerator_additive[] = {1055.9, 50.1689, 2.38111};
+const double pressure_numerator_multiplicative[] = {51.9634, 2.12694, 0.0718438};
+const double pressure_denominator[] = {28.2399, 42.5687, 53.4147};
+
+const float resistance_map[3][3] =
+		{
+			{ 20.5, 24.25, 27.5 }, //26,6
+			{ 24.5, 33.75, 42.5 }, //100
+			{ 34.25, 43.75, 52.5 }, //200
+		};
 
 const float valueOfBit = 0.0008056640625;
 
@@ -146,16 +155,36 @@ void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 	}
 }
 
+void calc_pressure(MeasureData *measure) {
+	switch(algorithm_status){
+			case CURRENT_26:
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_26] - pressure_numerator_multiplicative[CURRENT_26]
+											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_26]);
+				measure->pressure = pressure_multiplicative[CURRENT_26] * log(-pressure_logarithm_argument);
+				break;
+			case CURRENT_100:
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_100] - pressure_numerator_multiplicative[CURRENT_100]
+											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_100]);
+				measure->pressure = pressure_multiplicative[CURRENT_100] * log(-pressure_logarithm_argument);
+				break;
+			case CURRENT_200:
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_200] - pressure_numerator_multiplicative[CURRENT_200]
+											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_200]);
+				measure->pressure = pressure_multiplicative[CURRENT_200] * log(-pressure_logarithm_argument);
+				break;
+	}
+
+}
+
 void prepare_message_data(MeasureData measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
-	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f;%.3f;%.3f\n",
+	sprintf(data_tx, "%d;%d;%.3f;%.3f;%d;%.3f;%.3f;%.3f;%.3f;%.3f;%d\n",
 			*ptr_pwm, Measure[OPAMP_LOCATION], measure.voltageRawOpamp, measure.voltageLoad,
 			Measure[REFERENCE_LOCATION], measure.voltageReferenceResistor, measure.current,
-			measure.powerLoad, measure.resistanceLoad);
+			measure.powerLoad, measure.resistanceLoad, measure.pressure, algorithm_status);
 
 }
 
 void start_measure_manual(void) {
-
 	uart_tx_it(&huart2, first_message);
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, NUMBERS_ADC_CHANNELS);
@@ -179,16 +208,16 @@ void start_wobbul_raw(void) {
 	HAL_ADC_Start(&hadc1);
 	HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &Measure, NUMBERS_ADC_CHANNELS);
 	HAL_TIM_Base_Start_IT(&htim10); // Starting timer 10
-	status = WOBBUL;
+	measure_status = WOBBUL;
 	__HAL_TIM_SET_AUTORELOAD(&htim2, 5000);
 }
 
 void wobbuling(volatile enum MEASURE_STATUS STAT, volatile uint16_t PRESCALER, volatile uint16_t ARR){
-	if (status == WOBBUL && prescaler > 0 && arr != 0) {
+	if (measure_status == WOBBUL && prescaler > 0 && arr != 0) {
 		__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
 		*ptr_prescaler -= 1;
 
-	} else if (status == WOBBUL && prescaler == 0) {
+	} else if (measure_status == WOBBUL && prescaler == 0) {
 		*ptr_prescaler = 49;
 		__HAL_TIM_SET_PRESCALER(&htim2, *ptr_prescaler);
 	}
@@ -196,11 +225,11 @@ void wobbuling(volatile enum MEASURE_STATUS STAT, volatile uint16_t PRESCALER, v
 
 void start_wobbul_run(void){
 	__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
-	status = WOBBUL;
+	measure_status = WOBBUL;
 }
 
 void set_pulse_width(uint8_t value) {
-	if (status == RUN) {
+	if (measure_status == RUN) {
 		__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, value);
 	}
 }

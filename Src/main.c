@@ -26,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include "uart.h"
 #include "gauge.h"
 #include "fatfs_sd.h"
@@ -55,6 +56,7 @@ SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
 TIM_HandleTypeDef htim10;
+TIM_HandleTypeDef htim11;
 
 UART_HandleTypeDef huart2;
 
@@ -66,6 +68,7 @@ extern TIM_HandleTypeDef htim2;
 extern TIM_HandleTypeDef htim2;
 extern volatile uint32_t time;
 extern volatile enum DISK_STATUS card_status;
+extern volatile enum AUTO_MEASURE algorithm_status;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -77,6 +80,7 @@ static void MX_TIM10_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI1_Init(void);
+static void MX_TIM11_Init(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
@@ -120,6 +124,7 @@ int main(void)
   MX_ADC1_Init();
   MX_SPI1_Init();
   MX_FATFS_Init();
+  MX_TIM11_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -157,12 +162,16 @@ int main(void)
 		f_close(&file);
 	}
 
+	algorithm_status = CURRENT_26;
+
 	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
 
 		calc_data(&dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
+		//if (algorithm_status != STOP_AUTO)
+		calc_pressure(&dataStruct);
 	}
   /* USER CODE END 3 */
 }
@@ -423,6 +432,37 @@ static void MX_TIM10_Init(void)
 }
 
 /**
+  * @brief TIM11 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM11_Init(void)
+{
+
+  /* USER CODE BEGIN TIM11_Init 0 */
+
+  /* USER CODE END TIM11_Init 0 */
+
+  /* USER CODE BEGIN TIM11_Init 1 */
+
+  /* USER CODE END TIM11_Init 1 */
+  htim11.Instance = TIM11;
+  htim11.Init.Prescaler = 10999;
+  htim11.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim11.Init.Period = 9999;
+  htim11.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim11.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim11) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM11_Init 2 */
+
+  /* USER CODE END TIM11_Init 2 */
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -507,14 +547,33 @@ static void MX_GPIO_Init(void)
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim->Instance == TIM10) {
 		number++;
-		wobbuling(status, prescaler, arr);
+		wobbuling(measure_status, prescaler, arr);
 		prepare_message_data(dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
 		uart_tx_it(&huart2, data_tx);
 		if (card_status == DISK_OK) {
 			size_t len = strlen(data_tx);
 			strncpy(buffer, data_tx, len);
-			fresult = f_puts( buffer, &file);
+			fresult = f_puts(buffer, &file);
 			bufclear();
+		}
+	} else if (htim->Instance == TIM11) {
+		if (algorithm_status != STOP_AUTO) {
+			uart_tx(&huart2, "TIM11");
+			if (dataStruct.resistanceLoad > 0) {
+				if (dataStruct.resistanceLoad >= resistance_map[0][0]
+						&& dataStruct.resistanceLoad <= resistance_map[0][2]) {
+				} else if (dataStruct.resistanceLoad >= resistance_map[1][0]
+						&& dataStruct.resistanceLoad <= resistance_map[1][2]) {
+					*ptr_pwm = PWM_TO_CURRENT_100;
+					algorithm_status = CURRENT_100;
+					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+				} else if (dataStruct.resistanceLoad >= resistance_map[2][0]
+						&& dataStruct.resistanceLoad <= resistance_map[2][2]) {
+					*ptr_pwm = PWM_TO_CURRENT_200;
+					algorithm_status = CURRENT_200;
+					__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
+				}
+			}
 		}
 	}
 }
@@ -529,23 +588,35 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 		strncpy(first, data_rx, LEN_FIRST);
 		if (strncmp(first, "$SET_", LEN_FIRST) == 0) {
 			strncpy(second, data_rx + LEN_FIRST, MAX_LEN_SECOND); //
-			if (strncmp(second, "START", strlen("START")) == 0 && status != RUN) {
-				status = RUN;
+			if (strncmp(second, "START", strlen("START")) == 0 && measure_status != RUN) {
+				measure_status = RUN;
 
 				prescaler = 999;
 				pwm_init();
 				start_measure_manual();
 			} else if (strncmp(second, "STOP", MAX_LEN_SECOND) == 0) {
-				if (status == RUN) {
-					status = STOP;
+				if (measure_status == RUN) {
+					measure_status = STOP;
 					prescaler = 999;
 					stop_measure_manual();
 
-				} else if (status == WOBBUL) {
+				} else if (measure_status == WOBBUL) {
 					prescaler = 999;
 					stop_wobbul();
 				} //which STOP
+				else if (algorithm_status != START_AUTO) {
+					algorithm_status = STOP_AUTO;
+					*ptr_pwm = 0;
+
+					HAL_TIM_Base_Stop_IT(&htim11);
+					stop_measure_manual();
+				}
 			// to STOP
+			}else if (strncmp(second, "AUTO", MAX_LEN_SECOND) == 0) {
+				algorithm_status = CURRENT_26;
+				*ptr_pwm = PWM_TO_CURRENT_26;
+				HAL_TIM_Base_Start_IT(&htim11);
+				start_measure_manual();
 			} else if (strncmp(second, "10000", MAX_LEN_SECOND) == 0) {
 				*ptr_pwm = atoi(second) - 1;
 				//set_pulse_width(*ptr_pwm);
@@ -556,9 +627,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 				__HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, *ptr_pwm);
 			} else if (strncmp(second, "WOBB", MAX_LEN_SECOND) == 0) {
 				*ptr_pwm = 50 * 9999 / 100; // set PWM at 50%
-				if (status == RUN) {
+				if (measure_status == RUN) {
 					start_wobbul_raw();
-				} else if (status == STOP) {
+				} else if (measure_status == STOP) {
 					time = 0;
 					start_wobbul_raw();
 				}

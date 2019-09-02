@@ -29,6 +29,10 @@
 #define CALIBRE_OPAMP (0.997659f)
 #define ERROR_VOLTAGE (0.18f)
 #define ERROR_CURRENT (0.00083f)
+
+#define PWM_TO_CURRENT_26 1099
+#define PWM_TO_CURRENT_100 3036
+#define PWM_TO_CURRENT_200 6102
 //	!!DO NOT CHANGE!!
 
 #define NUMBERS_ADC_CHANNELS 2
@@ -48,12 +52,32 @@ typedef struct PIRANI_DATA {
 	volatile float current;
 	volatile float powerLoad;
 	volatile float resistanceLoad;
+	volatile double pressure;
 } MeasureData;
 
 enum MEASURE_STATUS { STOP=0, RUN=1, WOBBUL = 2};
 enum DISK_STATUS {DISK_OK = 0, DISK_ERROR = 1};
+enum AUTO_MEASURE {START_AUTO = -2, STOP_AUTO = -1, CURRENT_26 = 0, CURRENT_100 = 1, CURRENT_200 = 2};
 
 MeasureData dataStruct;
+const float resistance_map[3][3];
+
+const double pressure_multiplicative_26;
+const double pressure_multiplicative_100;
+const double pressure_multiplicative_200;
+
+const double pressure_numerator_additive_26;
+const double pressure_numerator_additive_100;
+const double pressure_numerator_additive_200;
+
+const double pressure_numerator_multiplicative_26;
+const double pressure_numerator_multiplicative_100;
+const double pressure_numerator_multiplicative_200;
+
+const double pressure_denominator_26;
+const double pressure_denominator_100;
+const double pressure_denominator_200;
+volatile double pressure_logarithm_argument;
 
 uint8_t *first_message;
 uint8_t *first_info;
@@ -73,7 +97,7 @@ uint8_t first[6], second[6]; // Tables for checking receive string
 uint8_t recv_comend[100];
 
 volatile int16_t value; // Variable using in receiving iterrupt
-volatile enum MEASURE_STATUS status; //Variable to seting function
+volatile enum MEASURE_STATUS measure_status; //Variable to seting function
 volatile uint16_t set_pwm;
 volatile uint16_t *ptr_pwm;
 volatile uint32_t number;
@@ -86,8 +110,6 @@ volatile uint16_t *ptr_prescaler;
 volatile uint16_t arr;
 volatile uint16_t *ptr_arr;
 
-// [ PWM, Rmax, Ropt, Rmin ]
-const uint16_t resistance_map[7][4];
 
 const float valueOfBit; //Voltage value of 1b -> 3.3/4096
 
