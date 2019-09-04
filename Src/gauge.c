@@ -10,6 +10,8 @@
 #include <math.h>
 #include "uart.h"
 #include "main.h"
+#include "fonts.h"
+#include "ssd1306.h"
 
 UART_HandleTypeDef huart2;
 ADC_HandleTypeDef hadc1;
@@ -269,4 +271,21 @@ void bufclear(void) {
 	for (uint16_t i = 0; i <1024; i++) {
 		buffer[i] = '\0';
 	}
+}
+
+char data_for_disp[12] = {0};
+
+void disp_pressure(const char *data){
+	SSD1306_GotoXY(0,0);
+	SSD1306_Puts(data, &Font_11x18, 1);
+}
+
+void disp_resistance(const char *data){
+	SSD1306_GotoXY(0, 25);
+	SSD1306_Puts(data, &Font_11x18, 1);
+}
+
+void disp_power(const char *data){
+	SSD1306_GotoXY(0, 45);
+	SSD1306_Puts(data, &Font_11x18, 1);
 }

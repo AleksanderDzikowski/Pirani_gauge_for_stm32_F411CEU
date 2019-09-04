@@ -53,6 +53,9 @@ typedef struct PIRANI_DATA {
 	volatile float powerLoad;
 	volatile float resistanceLoad;
 	volatile double pressure;
+	volatile double mean_pressure;
+	volatile double mean_resistance;
+	volatile double mean_power;
 } MeasureData;
 
 enum MEASURE_STATUS { STOP=0, RUN=1, WOBBUL = 2};
@@ -126,11 +129,13 @@ FATFS *pfs;
 DWORD fre_clust;
 uint32_t total, free_space;
 
+char data_for_disp[12];
 
 void uart_init(void);
 void pwm_init(void);
 void adc_init(void);
 void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]);
+void calc_pressure(MeasureData *measure);
 void prepare_message_data(MeasureData measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]);
 void start_measure_manual(void);
 void stop_measure_manual(void);
@@ -142,6 +147,9 @@ void wobbuling(volatile enum MEASURE_STATUS, volatile uint16_t, volatile uint16_
 void freq_set(uint8_t *);
 uint8_t buff_size (uint8_t *);
 void bufclear(void);
+void disp_pressure(const char *data);
+void disp_resistance(const char *data);
+void disp_power(const char *data);
 
 
 #endif /* GAUGE_H_ */

@@ -24,12 +24,17 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
 #include "uart.h"
 #include "gauge.h"
 #include "fatfs_sd.h"
+
+#include "fonts.h"
+#include "ssd1306.h"
+#include "test.h"
 
 /* USER CODE END Includes */
 
@@ -52,6 +57,8 @@
 ADC_HandleTypeDef hadc1;
 DMA_HandleTypeDef hdma_adc1;
 
+I2C_HandleTypeDef hi2c1;
+
 SPI_HandleTypeDef hspi1;
 
 TIM_HandleTypeDef htim2;
@@ -69,6 +76,8 @@ extern TIM_HandleTypeDef htim2;
 extern volatile uint32_t time;
 extern volatile enum DISK_STATUS card_status;
 extern volatile enum AUTO_MEASURE algorithm_status;
+
+extern char data_for_disp[12];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -81,13 +90,17 @@ static void MX_TIM2_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_TIM11_Init(void);
+static void MX_I2C1_Init(void);
 static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+uint8_t counter_of_data = 0;
+float power_sum = 0;
+float resistance_sum = 0;
+float pressure_sum = 0;
 /* USER CODE END 0 */
 
 /**
@@ -125,6 +138,7 @@ int main(void)
   MX_SPI1_Init();
   MX_FATFS_Init();
   MX_TIM11_Init();
+  MX_I2C1_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -142,37 +156,92 @@ int main(void)
 	fresult = f_mount(&fs, "", 1);
 
 	if (fresult != FR_OK) {
-		uart_tx(&huart2, "error in mounting SD CARD...\n");
+		uart_tx(&huart2, (uint8_t *)"error in mounting SD CARD...\n");
 	}
 	else {
 		card_status = DISK_OK;
-		uart_tx(&huart2, "SD CARD mounted successfully...\n");
+		uart_tx(&huart2, (uint8_t *)"SD CARD mounted successfully...\n");
 		//Check card capacity
 		f_getfree("", &fre_clust, &pfs);
 		total = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
 		sprintf(buffer, "SD CARD Total Size: \t%lu\n", total);
-		uart_tx(&huart2, buffer);
+		uart_tx(&huart2, (uint8_t *)buffer);
 		bufclear();
 		free_space = (uint32_t)(fre_clust * pfs->csize * 0.5);
 		sprintf(buffer, "SD CARD Free space:\t%lu\n", free_space);
-		uart_tx(&huart2, buffer);
+		uart_tx(&huart2, (uint8_t *)buffer);
 		bufclear();
 		while( ( fresult = f_open(&file,"measure.csv",FA_OPEN_ALWAYS | FA_READ | FA_WRITE )  ) != FR_OK );
-		uart_tx(&huart2, "measure.csv created\n");
+		uart_tx(&huart2, (uint8_t *)"measure.csv created\n");
 		f_close(&file);
 	}
 
-	algorithm_status = CURRENT_26;
-
+	algorithm_status = CURRENT_100;
+	SSD1306_Init();
+	dataStruct.pressure = 0;
 	while (1) {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
 		calc_data(&dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
-		//if (algorithm_status != STOP_AUTO)
 		calc_pressure(&dataStruct);
+
+		sprintf(data_for_disp, "p:%.4fmba", dataStruct.pressure);
+		disp_pressure(data_for_disp);
+		sprintf(data_for_disp, "R:%.2fOhm", dataStruct.resistanceLoad);
+		disp_resistance(data_for_disp);
+		sprintf(data_for_disp, "P:%.2fW", dataStruct.powerLoad);
+		disp_power(data_for_disp);
+		SSD1306_UpdateScreen();
+		HAL_Delay(50);
+	/*
+	if (algorithm_status != STOP_AUTO || measure_status != STOP) {
+		calc_data(&dataStruct, Measure[NUMBERS_ADC_CHANNELS]);
+		calc_pressure(&dataStruct);
+
+		//pressure_array[counter_of_data] = dataStruct.pressure;
+		pressure_sum += dataStruct.pressure;
+		//resistance_array[counter_of_data] = dataStruct.resistanceLoad;
+		resistance_sum += dataStruct.resistanceLoad;
+		//power_array[counter_of_data] = dataStruct.powerLoad;
+		power_sum += dataStruct.powerLoad;
+
+		if (counter_of_data == 9) {
+
+			//dataStruct.mean_resistance = resistance_sum / counter_of_data;
+ 			//dataStruct.mean_pressure = pressure_sum /counter_of_data;
+			//dataStruct.mean_power = power_sum /counter_of_data;
+
+			sprintf(data_for_disp, "p:%.3fmba", dataStruct.pressure);
+			disp_pressure(data_for_disp);
+			sprintf(data_for_disp, "R:%.2fOhm", dataStruct.resistanceLoad);
+			disp_resistance(data_for_disp);
+			sprintf(data_for_disp, "P:%.2fW", dataStruct.powerLoad);
+			disp_power(data_for_disp);
+			SSD1306_UpdateScreen();
+			HAL_Delay(50);
+
+			resistance_sum = 0;
+			pressure_sum = 0;
+			power_sum = 0;
+			dataStruct.mean_resistance = 0;
+			dataStruct.mean_pressure = 0;
+			dataStruct.mean_power = 0;
+			counter_of_data = 0;
+		}
+		counter_of_data++;
+	} else {
+		SSD1306_GotoXY(0,0);
+		SSD1306_Puts("UP -> START", &Font_11x18, 1);
+		SSD1306_GotoXY(0,25);
+		SSD1306_Puts("DOWN ->  ", &Font_11x18, 1);
+		SSD1306_GotoXY(0,45);
+		SSD1306_Puts("   STOP ", &Font_11x18, 1);
+		SSD1306_UpdateScreen();
+		HAL_Delay(50);
+	}*/
 	}
+
   /* USER CODE END 3 */
 }
 
@@ -300,6 +369,40 @@ static void MX_ADC1_Init(void)
   /* USER CODE BEGIN ADC1_Init 2 */
 
   /* USER CODE END ADC1_Init 2 */
+
+}
+
+/**
+  * @brief I2C1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_I2C1_Init(void)
+{
+
+  /* USER CODE BEGIN I2C1_Init 0 */
+
+  /* USER CODE END I2C1_Init 0 */
+
+  /* USER CODE BEGIN I2C1_Init 1 */
+
+  /* USER CODE END I2C1_Init 1 */
+  hi2c1.Instance = I2C1;
+  hi2c1.Init.ClockSpeed = 400000;
+  hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+  hi2c1.Init.OwnAddress1 = 0;
+  hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+  hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+  hi2c1.Init.OwnAddress2 = 0;
+  hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+  hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+  if (HAL_I2C_Init(&hi2c1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN I2C1_Init 2 */
+
+  /* USER CODE END I2C1_Init 2 */
 
 }
 
@@ -521,24 +624,14 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, LCD_BL_Pin|LCD_RST_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(SD_CS_GPIO_Port, SD_CS_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, SD_CS_Pin|LCD_CS_Pin|LCD_DC_Pin, GPIO_PIN_RESET);
-
-  /*Configure GPIO pins : LCD_BL_Pin LCD_RST_Pin */
-  GPIO_InitStruct.Pin = LCD_BL_Pin|LCD_RST_Pin;
+  /*Configure GPIO pin : SD_CS_Pin */
+  GPIO_InitStruct.Pin = SD_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : SD_CS_Pin LCD_CS_Pin LCD_DC_Pin */
-  GPIO_InitStruct.Pin = SD_CS_Pin|LCD_CS_Pin|LCD_DC_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+  HAL_GPIO_Init(SD_CS_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -558,7 +651,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 		}
 	} else if (htim->Instance == TIM11) {
 		if (algorithm_status != STOP_AUTO) {
-			uart_tx(&huart2, "TIM11");
+			uart_tx(&huart2, (uint8_t *)"TIM11");
 			if (dataStruct.resistanceLoad > 0) {
 				if (dataStruct.resistanceLoad >= resistance_map[0][0]
 						&& dataStruct.resistanceLoad <= resistance_map[0][2]) {
@@ -595,8 +688,10 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 				pwm_init();
 				start_measure_manual();
 			} else if (strncmp(second, "STOP", MAX_LEN_SECOND) == 0) {
+
+				measure_status = STOP;
 				if (measure_status == RUN) {
-					measure_status = STOP;
+
 					prescaler = 999;
 					stop_measure_manual();
 
@@ -634,14 +729,14 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *uart) {
 					start_wobbul_raw();
 				}
 			} else {
-				uart_tx_it(&huart2, "Wrong format. Try again.\n");
+				uart_tx_it(&huart2, (uint8_t *)"Wrong format. Try again.\n");
 			}
 		//strncmp to $SET_
-		} else if (strncmp(first, "$RLC_", LEN_FIRST) == 0) {
-			strncpy(second, data_rx + (uint8_t)LEN_FIRST, MAX_LEN_SECOND);
+		} else if (strncmp(first, (const char )"$RLC_", LEN_FIRST) == 0) {
+			strncpy(second, (const char ) (data_rx + (uint8_t)LEN_FIRST), MAX_LEN_SECOND);
 			freq_set(second);
 		} else {
-			uart_tx_it(&huart2, "Wrong format. Code should started with $SET_xxxxx.\n");
+			uart_tx_it(&huart2, (uint8_t *)"Wrong format. Code should started with $SET_xxxxx.\n");
 		}
 		count = 0;
 		memset(&data_rx, '\0', sizeof(data_rx));
