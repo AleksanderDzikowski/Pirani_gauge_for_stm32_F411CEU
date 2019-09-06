@@ -60,7 +60,7 @@ volatile uint16_t arr = 9999;
 volatile uint16_t *ptr_arr = &arr;
 
 volatile enum AUTO_MEASURE algorithm_status = STOP;
-const double pressure_multiplicative[] = {0.42372, 0.47720, 0.5137};
+const double pressure_multiplicative[] = {0.42372, 0.47720, 0.51378};
 const double pressure_numerator_additive[] = {1055.9, 50.1689, 2.38111};
 const double pressure_numerator_multiplicative[] = {51.9634, 2.12694, 0.0718438};
 const double pressure_denominator[] = {28.2399, 42.5687, 53.4147};
@@ -135,16 +135,6 @@ void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 	else
 		measure->voltageLoad = measure->voltageRawOpamp * VOLATGE_DIVIDER * CALIBRE_LOAD_MEAN - ERROR_VOLTAGE;
 
-
-	/*measure->voltageLoad = CALIBRE_LOAD_POLYNOMIAL_SQUARE *
-			(( measure->voltageRawOpamp * VOLATGE_DIVIDER )*( (measure->voltageRawOpamp) * VOLATGE_DIVIDER))
-			+ (CALIBRE_LOAD_POLYNOMIAL_LINEAR * ( (measure->voltageRawOpamp) * VOLATGE_DIVIDER));
-	*/
-
-
-
-
-
 	measure->voltageReferenceResistor = Measure[REFERENCE_LOCATION] * valueOfBit * CALIBRE_REF;
 
 	measure->current = (measure->voltageReferenceResistor / referenceResistor) - ERROR_CURRENT;
@@ -160,19 +150,22 @@ void calc_data(MeasureData *measure, uint16_t adc_value[NUMBERS_ADC_CHANNELS]) {
 void calc_pressure(MeasureData *measure) {
 	switch(algorithm_status){
 			case CURRENT_26:
-				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_26] - pressure_numerator_multiplicative[CURRENT_26]
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_26] + pressure_numerator_multiplicative[CURRENT_26]
 											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_26]);
-				measure->pressure = pressure_multiplicative[CURRENT_26] * log(-pressure_logarithm_argument);
+				measure->pressure = pressure_multiplicative[CURRENT_26] * log(pressure_logarithm_argument);
 				break;
 			case CURRENT_100:
-				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_100] - pressure_numerator_multiplicative[CURRENT_100]
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_100] + pressure_numerator_multiplicative[CURRENT_100]
 											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_100]);
-				measure->pressure = pressure_multiplicative[CURRENT_100] * log(-pressure_logarithm_argument);
+				measure->pressure = pressure_multiplicative[CURRENT_100] * log(pressure_logarithm_argument);
 				break;
 			case CURRENT_200:
-				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_200] - pressure_numerator_multiplicative[CURRENT_200]
+				pressure_logarithm_argument = (pressure_numerator_additive[CURRENT_200] + pressure_numerator_multiplicative[CURRENT_200]
 											*measure->resistanceLoad) / (measure->resistanceLoad - pressure_denominator[CURRENT_200]);
-				measure->pressure = pressure_multiplicative[CURRENT_200] * log(-pressure_logarithm_argument);
+				measure->pressure = pressure_multiplicative[CURRENT_200] * log(pressure_logarithm_argument);
+				break;
+			case STOP_AUTO:
+			default:
 				break;
 	}
 
