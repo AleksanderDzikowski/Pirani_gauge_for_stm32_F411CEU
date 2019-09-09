@@ -176,9 +176,7 @@ int main(void) {
 		f_close(&file);
 	}
 
-	//
-	algorithm_status = CURRENT_100;
-	//
+	algorithm_status = CURRENT_200;
 	SSD1306_Init();
 	dataStruct.pressure = 0;
 	while (1) {
