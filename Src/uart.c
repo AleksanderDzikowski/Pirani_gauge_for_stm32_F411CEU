@@ -2,7 +2,7 @@
  * uart.c
  *
  *  Created on: Jun 6, 2019
- *      Author: root
+ * Author: 		: Aleksander Dzikowski
  */
 
 #include "uart.h"

@@ -1,6 +1,7 @@
 /* USER CODE BEGIN Header */
 /**
   ******************************************************************************
+  * Author: 		: Aleksander Dzikowski
   * @file           : main.h
   * @brief          : Header for main.c file.
   *                   This file contains the common defines of the application.

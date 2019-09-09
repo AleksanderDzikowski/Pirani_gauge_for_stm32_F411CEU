@@ -2,7 +2,7 @@
  * gauge.c
  *
  *  Created on: Aug 26, 2019
- *      Author: root
+ *      Author: Aleksander Dzikowski
  */
 
 #include "gauge.h"

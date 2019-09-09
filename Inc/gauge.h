@@ -2,7 +2,7 @@
  * gauge.h
  *
  *  Created on: Aug 26, 2019
- *      Author: root
+ * Author: 		: Aleksander Dzikowski
  */
 
 #ifndef GAUGE_H_
